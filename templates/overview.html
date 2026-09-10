@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | UPIA Bonus Calculator</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2L2 12l10 10 10-10L12 2z'/></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</head>
+<body>
+    <div id="app-wrapper">
+        <!-- Top Navigation Bar -->
+        <header class="top-navbar">
+            <div class="nav-brand">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 12l10 10 10-10L12 2z"/></svg>
+                </div>
+                <span class="logo-text">UPIA</span>
+            </div>
+            <div class="nav-user-profile">
+                <div class="avatar-circle" id="top-user-avatar" title="View Profile Details">
+                    <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <div class="user-meta">
+                    <span class="user-name" id="top-user-name">Loading...</span>
+                    <span class="user-role" id="top-user-role">...</span>
+                </div>
+                <button id="btn-logout-top" class="icon-btn-logout" title="Sign Out">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Layout -->
+        <div class="app-layout">
+            <!-- Sidebar Navigation -->
+            <aside class="sidebar">
+                <ul class="sidebar-menu">
+                    <li class="menu-item active" data-view="dashboard">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        <span class="menu-text">Dashboard</span>
+                    </li>
+                    <li class="menu-item" data-view="band-guide">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        <span class="menu-text">Band Guide</span>
+                    </li>
+                    <li class="menu-item" data-view="help">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        <span class="menu-text">Help</span>
+                    </li>
+                </ul>
+
+                <div class="sidebar-footer-card">
+                    <div class="status-indicator">
+                        <span class="status-dot green"></span>
+                        <span class="status-title">Configuration</span>
+                    </div>
+                    <p class="status-sub">System Loaded</p>
+                    <small id="last-updated-text" style="color: var(--text-muted)">Live tracking active</small>
+                </div>
+            </aside>
+                <main class="main-workspace">
+                
+                <!-- VIEW 1: DASHBOARD -->
+                <div id="view-dashboard" class="view-panel active">
+                    <div class="workspace-header">
+                        <div>
+                            <h1 class="welcome-title">Welcome back, <span id="hero-user-firstname">User</span></h1>
+                            <p class="welcome-sub">Your performance drives your bonus. Keep going!</p>
+                        </div>
+                        
+                        <!-- Month Filter Dropdown -->
+                        <div class="month-filter-wrap">
+                            <label for="month-filter" class="month-label">Performance Month:</label>
+                            <select id="month-filter" class="month-select">
+                                <!-- JS dynamically populates past months and selects 2 months prior as default -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- TOP PROFILE & ELIGIBILITY BANNER -->
+                    <div class="card slim-profile-card">
+                        <div class="slim-info-section">
+                            <div class="slim-info-item">
+                                <small>Employee Name</small>
+                                <strong id="emp-info-name">-</strong>
+                            </div>
+                            <div class="slim-info-item">
+                                <small>Staff ID</small>
+                                <strong id="emp-info-id">-</strong>
+                            </div>
+                            <div class="slim-info-item">
+                                <small>Role</small>
+                                <strong id="emp-info-role">-</strong>
+                            </div>
+                            <div class="slim-info-item">
+                                <small>Pairs</small>
+                                <strong id="emp-info-pairs">-</strong>
+                            </div>
+                            <div class="slim-info-item">
+                                <small>Base Salary (KES)</small>
+                                <div class="salary-action-wrap">
+                                    <input type="number" id="salary" value="" placeholder="Enter Salary..." class="table-input salary-input">
+                                    <button type="button" id="btn-calculate" class="btn-primary btn-calc-top">Calculate</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slim-eligibility-section">
+                            <small>ELIGIBILITY STATUS</small>
+                            <div id="eligibility-container">
+                                <!-- JS injects eligibility badge here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HERO STACK: Total Payout & Next Band -->
+                    <div class="hero-top-stack">
+                        
+                        <!-- TOTAL PAYOUT CARD -->
+                        <div class="card hero-payout-card">
+                            <h3 class="card-sm-title">TOTAL PAYOUT</h3>
+                            <h1 class="hero-payout-amount" id="res-total-payout">KSh 0</h1>
+
+                            <div class="hero-inner-box">
+                                <div class="inner-stat">
+                                    <small>BASIC SALARY</small>
+                                    <strong id="res-basic-salary">KSh 0</strong>
+                                </div>
+                                <div class="inner-stat">
+                                    <small>BONUS EARNED</small>
+                                    <strong id="res-bonus-earned">KSh 0</strong>
+                                </div>
+                                <div class="inner-stat">
+                                    <small>FOUNDER'S BONUS</small>
+                                    <strong id="res-founders-bonus" class="text-amber">KSh 0</strong>
+                                </div>
+                            </div>
+
+                            <div class="hero-footer">
+                                <span>Current Band: <strong id="res-current-band-full">-</strong></span>
+                                <span>Multiplier: <strong id="res-multiplier">-</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- NEXT BAND OPPORTUNITY CARD -->
+                        <div class="card hero-next-band-card">
+                            <h3 class="card-sm-title">NEXT BAND OPPORTUNITY</h3>
+                            <div class="band-transition-text">
+                                <span id="hero-curr-band">Growth</span> &rarr; <strong id="hero-next-band" class="text-amber">Tension</strong>
+                            </div>
+
+                            <div class="progress-bar-wrap hero-prog-wrap">
+                                <div class="progress-bar-fill" id="res-prog-fill" style="width: 0%;"></div>
+                            </div>
+                            <div class="progress-meta right-align">
+                                <span id="res-prog-text">0 / 0 customers total</span>
+                            </div>
+
+                            <div class="opportunity-inner-grid">
+                                <div class="inner-stat-box">
+                                    <small>CUSTOMERS NEEDED</small>
+                                    <h4 id="res-cust-needed">0</h4>
+                                </div>
+                                <div class="inner-stat-box">
+                                    <small>POTENTIAL EARNINGS</small>
+                                    <h4 id="res-pot-earnings">KSh 0</h4>
+                                </div>
+                                <div class="inner-stat-box">
+                                    <small>GROWTH VALUE</small>
+                                    <h4 id="res-growth-value" class="text-amber">+ KSh 0</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Performance Metrics Table -->
+                    <div class="dashboard-columns single-column-override">
+                        <div class="card shadow-sm">
+                            <h3 style="margin-bottom: 12px; font-size: 12px;">
+                                <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                                Performance Metrics & Targets
+                            </h3>
+                            <form id="calculator-form">
+                                <input type="hidden" id="customers" value="0">
+
+                                <div class="table-responsive">
+                                    <table class="data-table metrics-interactive-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Metric</th>
+                                                <th>Target</th>
+                                                <th>Achieved</th>
+                                                <th><span class="name-full">Difference</span><span class="name-abbr">Diff.</span></th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Disbursement Rate -->
+                                            <tr class="metric-row" data-metric="disbursement">
+                                                <td class="metric-name">
+                                                    <span class="expand-icon">›</span> 
+                                                    <span class="name-full">Disbursement Rate</span>
+                                                    <span class="name-abbr">Disb. Rate</span>
+                                                </td>
+                                                <td>98.0%</td>
+                                                <td>
+                                                    <div class="table-input-wrap">
+                                                        <input type="number" step="0.1" id="disbursement" value="0" class="table-input" readonly><span class="input-symbol">%</span>
+                                                    </div>
+                                                </td>
+                                                <td id="diff-disbursement" class="diff-val">+0.0%</td>
+                                                <td id="status-disbursement"><span class="status-badge met">✓ Met</span></td>
+                                            </tr>
+                                            <tr class="details-row" id="details-disbursement">
+                                                <td colspan="5">
+                                                    <div class="metric-details-box">
+                                                        <span>Actual Disbursed: <strong id="fig-disb-actual">KSh 0</strong></span>
+                                                        <span>Target: <strong id="fig-disb-target">KSh 0</strong></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <!-- Active Customers % -->
+                                            <tr class="metric-row" data-metric="active_customers">
+                                                <td class="metric-name">
+                                                    <span class="expand-icon">›</span> 
+                                                    <span class="name-full">Active Customers %</span>
+                                                    <span class="name-abbr">Active Cust. %</span>
+                                                </td>
+                                                <td>95.0%</td>
+                                                <td>
+                                                    <div class="table-input-wrap">
+                                                        <input type="number" step="0.1" id="active_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span>
+                                                    </div>
+                                                </td>
+                                                <td id="diff-active-customers" class="diff-val">+0.0%</td>
+                                                <td id="status-active-customers"><span class="status-badge met">✓ Met</span></td>
+                                            </tr>
+                                            <tr class="details-row" id="details-active_customers">
+                                                <td colspan="5">
+                                                    <div class="metric-details-box">
+                                                        <span>Active Customers: <strong id="fig-ac-actual">0</strong></span>
+                                                        <span>Target: <strong id="fig-ac-target">0</strong></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <!-- New Customers % -->
+                                            <tr class="metric-row" data-metric="new_customers">
+                                                <td class="metric-name">
+                                                    <span class="expand-icon">›</span> 
+                                                    <span class="name-full">New Customers %</span>
+                                                    <span class="name-abbr">New Cust. %</span>
+                                                </td>
+                                                <td>95.0%</td>
+                                                <td>
+                                                    <div class="table-input-wrap">
+                                                        <input type="number" step="0.1" id="new_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span>
+                                                    </div>
+                                                </td>
+                                                <td id="diff-new-customers" class="diff-val">0.0%</td>
+                                                <td id="status-new-customers"><span class="status-badge met">✓ Met</span></td>
+                                            </tr>
+                                            <tr class="details-row" id="details-new_customers">
+                                                <td colspan="5">
+                                                    <div class="metric-details-box">
+                                                        <span>New Customers: <strong id="fig-nc-actual">0</strong></span>
+                                                        <span>Target: <strong id="fig-nc-target">0</strong></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <!-- OTC Rate -->
+                                            <tr class="metric-row" data-metric="otc">
+                                                <td class="metric-name">
+                                                    <span class="expand-icon">›</span> 
+                                                    <span class="name-full">OTC Rate</span>
+                                                    <span class="name-abbr">OTC Rate</span>
+                                                </td>
+                                                <td>91.5%</td>
+                                                <td>
+                                                    <div class="table-input-wrap">
+                                                        <input type="number" step="0.1" id="otc" value="0" class="table-input" readonly><span class="input-symbol">%</span>
+                                                    </div>
+                                                </td>
+                                                <td id="diff-otc" class="diff-val">+0.0%</td>
+                                                <td id="status-otc"><span class="status-badge met">✓ Met</span></td>
+                                            </tr>
+                                            <tr class="details-row" id="details-otc">
+                                                <td colspan="5">
+                                                    <div class="metric-details-box">
+                                                        <span>Overall OTC Rate: <strong id="fig-otc-val">0.0%</strong></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <!-- DD+7 Rate -->
+                                            <tr class="metric-row" data-metric="dd7">
+                                                <td class="metric-name">
+                                                    <span class="expand-icon">›</span> 
+                                                    <span class="name-full">DD+7 Rate</span>
+                                                    <span class="name-abbr">DD+7 Rate</span>
+                                                </td>
+                                                <td>94.0%</td>
+                                                <td>
+                                                    <div class="table-input-wrap">
+                                                        <input type="number" step="0.1" id="dd7" value="0" class="table-input" readonly><span class="input-symbol">%</span>
+                                                    </div>
+                                                </td>
+                                                <td id="diff-dd7" class="diff-val">+0.0%</td>
+                                                <td id="status-dd7"><span class="status-badge met">✓ Met</span></td>
+                                            </tr>
+                                            <tr class="details-row" id="details-dd7">
+                                                <td colspan="5">
+                                                    <div class="metric-details-box">
+                                                        <span>DD+7 Rate: <strong id="fig-dd7-val">0.0%</strong></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            <!-- New Customer OTC -->
+                                            <tr class="metric-row" data-metric="new_customer_otc">
+                                                <td class="metric-name">
+                                                    <span class="expand-icon">›</span> 
+                                                    <span class="name-full">New Customer OTC</span>
+                                                    <span class="name-abbr">New Cust. OTC</span>
+                                                </td>
+                                                <td>90.0%</td>
+                                                <td>
+                                                    <div class="table-input-wrap">
+                                                        <input type="number" step="0.1" id="new_customer_otc" value="0" class="table-input" readonly><span class="input-symbol">%</span>
+                                                    </div>
+                                                </td>
+                                                <td id="diff-new-cust-otc" class="diff-val">+0.0%</td>
+                                                <td id="status-new-cust-otc"><span class="status-badge met">✓ Met</span></td>
+                                            </tr>
+                                            <tr class="details-row" id="details-new_customer_otc">
+                                                <td colspan="5">
+                                                    <div class="metric-details-box">
+                                                        <span>New Customer OTC: <strong id="fig-new-otc-val">0.0%</strong></span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: BAND GUIDE -->
+                <div id="view-band-guide" class="view-panel" style="display: none;">
+                    <div class="workspace-header">
+                        <h1>Band Guide & Multipliers</h1>
+                        <p class="welcome-sub">Overview of performance tiers and associated reward multipliers.</p>
+                    </div>
+                    <div class="card shadow-sm">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Band Level</th><th>Customer Threshold</th><th>Multiplier</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Floor</td><td>&lt; 250</td><td>0.8x</td></tr>
+                                <tr><td>Baseline</td><td>250 - 350</td><td>1.2x</td></tr>
+                                <tr><td>Growth</td><td>351 - 450</td><td>1.3x</td></tr>
+                                <tr><td>Tension</td><td>451 - 550</td><td>1.6x</td></tr>
+                                <tr><td>Pre-Elite</td><td>551 - 700</td><td>1.8x</td></tr>
+                                <tr><td>Elite</td><td>701+</td><td>2.0x</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VIEW 3: HELP -->
+                <div id="view-help" class="view-panel" style="display: none;">
+                    <div class="workspace-header">
+                        <h1>Help & Support</h1>
+                        <p class="welcome-sub">Frequently Asked Questions and assistance.</p>
+                    </div>
+                    <div class="card shadow-sm">
+                        <h3>How is my bonus calculated?</h3>
+                        <p>Your bonus is computed using your customer band multiplier combined with your target performance criteria (Disbursement, Active Customers, OTC, DD+7).</p>
+                    </div>
+                </div>
+
+            </main>           
+        </div>
+    </div>
+
+    <!-- Floating Theme Toggle Button -->
+    <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme">
+        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+    <!-- Top Navbar Avatar Element -->
+
+
+    <!-- Employee Details Modal -->
+    <div id="mobile-profile-modal" class="profile-modal-overlay">
+        <div class="profile-modal-card">
+            <div class="profile-modal-header">
+                <h3>Employee Profile Details</h3>
+                <button type="button" id="close-profile-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="profile-modal-body">
+                <div class="modal-detail-item">
+                    <small>Full Name</small>
+                    <strong id="modal-emp-name">-</strong>
+                </div>
+                <div class="modal-detail-item">
+                    <small>Staff ID</small>
+                    <strong id="modal-emp-id">-</strong>
+                </div>
+                <div class="modal-detail-item">
+                    <small>Role</small>
+                    <strong id="modal-emp-role">-</strong>
+                </div>
+                <div class="modal-detail-item">
+                    <small>Branch</small>
+                    <strong id="modal-emp-branch">-</strong>
+                </div>
+                <div class="modal-detail-item">
+                    <small>Pairs</small>
+                    <strong id="modal-emp-pairs">-</strong>
+                </div>
+                <div class="modal-detail-item">
+                    <small>Email</small>
+                    <strong id="modal-emp-email">-</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Pass data from Flask -->
+    <script id="staff-data-json" type="application/json">{{ employees_json | safe }}</script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

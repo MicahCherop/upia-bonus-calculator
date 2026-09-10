@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | UPIA Bonus Calculator</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2L2 12l10 10 10-10L12 2z'/></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Add Google Identity Script -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</head>
+<body>
+    <div id="login-wrapper" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div class="card" style="width: 100%; max-width: 400px; text-align: center; padding: 48px 32px; box-shadow: var(--shadow-floating);">
+            
+            <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px;">UPIA <span style="color: var(--primary-amber);">BONUS</span></h1>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 32px;">Employee Performance & Bonus Management</p>
+            
+            <!-- Google Sign-In Wrapper -->
+            <div id="g_id_onload"
+                 data-client_id="85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleLogin"
+                 data-auto_prompt="false">
+            </div>
+
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="outline"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-logo_alignment="left"
+                 style="display: flex; justify-content: center; margin-bottom: 12px;">
+            </div>
+            
+            <p id="auth-status-text" style="display: none; color: var(--success); font-size: 13px; margin-top: 16px; font-weight: 600;">
+                <span style="display: inline-block; background: var(--success-bg); color: var(--success); padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-right: 4px;">✓</span> Access granted. Redirecting...
+            </p>
+            <p id="login-error" style="color: var(--danger); background: var(--danger-bg); padding: 8px; border-radius: 6px; display: none; margin-top: 16px; font-size: 12px; font-weight: 500;"></p>
+            
+        </div>
+    </div>
+
+    <!-- Floating Theme Toggle -->
+    <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme">
+        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
