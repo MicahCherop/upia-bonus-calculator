@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | UPIA Bonus Calculator</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2L2 12l10 10 10-10L12 2z'/></svg>">
+    <link rel="icon" type="image/jpeg" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Add Google Identity Script -->
@@ -18,27 +18,25 @@
     <div id="login-wrapper" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;">
         <div class="card" style="width: 100%; max-width: 400px; text-align: center; padding: 48px 32px; box-shadow: var(--shadow-floating);">
             
-            <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px;">UPIA <span style="color: var(--primary-amber);">BONUS</span></h1>
+            <!-- 4G Capital Logo Image -->
+            <img src="https://images.squarespace-cdn.com/content/v1/55ed8436e4b038f693789ca0/1599234024445-FSJEOUYNYWV4X6HDN50R/4G+CAPITAL+LOGO+FA-01.png?format=750w" 
+                 alt="4G Capital Logo" 
+                 style="max-width: 160px; height: auto; display: block; margin: 0 auto 16px auto;">
+
+            <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px;">Upia Bonus Calculator <span style="color: var(--primary-amber);"></h1>
             <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 32px;">Employee Performance & Bonus Management</p>
             
             <!-- Google Sign-In Wrapper -->
             <div id="g_id_onload"
-                 data-client_id="85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com"
-                 data-context="signin"
-                 data-ux_mode="popup"
-                 data-callback="handleGoogleLogin"
-                 data-auto_prompt="false">
+                data-client_id="85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com"
+                data-context="signin"
+                data-ux_mode="popup"
+                data-callback="handleGoogleLogin"
+                data-auto_prompt="false">
             </div>
 
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-shape="rectangular"
-                 data-theme="outline"
-                 data-text="signin_with"
-                 data-size="large"
-                 data-logo_alignment="left"
-                 style="display: flex; justify-content: center; margin-bottom: 12px;">
-            </div>
+            <!-- Dynamic Theme-Responsive Google Button Container -->
+            <div id="g_id_signin_container" style="display: flex; justify-content: center; margin-bottom: 12px; min-height: 40px;"></div>
             
             <p id="auth-status-text" style="display: none; color: var(--success); font-size: 13px; margin-top: 16px; font-weight: 600;">
                 <span style="display: inline-block; background: var(--success-bg); color: var(--success); padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-right: 4px;">✓</span> Access granted. Redirecting...

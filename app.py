@@ -88,7 +88,10 @@ def auth_google():
             print(f"DEBUG: Authorized emails found -> {list(staff_data.keys())}")
             
             if email in staff_data:
-                user_info = staff_data[email]
+                # Copy dictionary to avoid mutating cached Redis config object in memory
+                user_info = dict(staff_data[email])
+                user_info['picture'] = idinfo.get('picture', '')
+                
                 user_branch = str(user_info.get('branch', '')).strip().lower()
                 emp_type = str(user_info.get('type', '')).strip().upper()
                 
@@ -169,7 +172,6 @@ def auth_google():
 
     except ValueError:
         return jsonify({'success': False, 'error': 'Invalid Google session.'}), 401
-
 
 def sanitize_floats(obj):
     """Recursively converts Python Infinity and NaN into JSON-safe None (null)."""

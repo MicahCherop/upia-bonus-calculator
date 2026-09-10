@@ -458,3 +458,40 @@
         document.getElementById('calculator-form')?.addEventListener('submit', (e) => { e.preventDefault(); runCalculation(); });
     }
 })();
+// Sign Out listener for inside the top-right profile drawer
+document.getElementById('btn-logout-drawer')?.addEventListener('click', () => {
+    sessionStorage.clear();
+    window.location.href = '/';
+});
+// Render Theme-Responsive Rounded Google Sign-In Button
+function renderGoogleButton() {
+    const container = document.getElementById('g_id_signin_container');
+    if (!container || typeof google === 'undefined' || !google.accounts) return;
+
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    
+    // Clear existing iframe before re-rendering
+    container.innerHTML = '';
+
+    google.accounts.id.renderButton(
+        container,
+        {
+            type: "standard",
+            shape: "pill", // Pill shape for increased border-radius
+            theme: currentTheme === 'dark' ? "filled_black" : "outline", // Theme sync
+            text: "signin_with",
+            size: "medium", // Reduced compact size
+            logo_alignment: "left"
+        }
+    );
+}
+
+// Call renderGoogleButton when window loads and when theme toggle button is clicked
+window.addEventListener('load', () => {
+    setTimeout(renderGoogleButton, 300);
+});
+
+document.getElementById('theme-toggle-btn')?.addEventListener('click', () => {
+    // Small delay to allow data-theme attribute change to complete first
+    setTimeout(renderGoogleButton, 50);
+});
