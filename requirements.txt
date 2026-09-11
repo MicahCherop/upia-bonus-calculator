@@ -5,3 +5,4 @@ google-auth-oauthlib==1.2.0
 python-dotenv==1.0.1
 redis==5.0.4
 gunicorn==22.0.0
+Flask-Compress==1.14
