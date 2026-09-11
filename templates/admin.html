@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal | UPIA</title>
+    <link rel="icon" type="image/jpeg" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        // Basic Client-Side Security Guard
+        const userStr = sessionStorage.getItem('upia_user');
+        if (!userStr) window.location.href = '/';
+        const user = JSON.parse(userStr);
+        if (!user.type || !user.type.toUpperCase().includes('ADMIN')) {
+            alert('Unauthorized Access. Redirecting to your dashboard.');
+            window.location.href = '/overview';
+        }
+    </script>
+</head>
+<body>
+    <div id="app-wrapper">
+        <!-- Admin Top Navbar -->
+        <header class="top-navbar" style="border-bottom: 2px solid var(--danger);">
+            <div class="nav-brand" style="display: flex; align-items: center; gap: 8px;">
+                <img src="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B" alt="UPIA Logo" style="width: 24px; height: 24px; border-radius: 6px; object-fit: cover;">
+                <span class="logo-text">UPIA <strong style="color: var(--danger); margin-left: 4px;">ADMIN</strong></span>
+            </div>
+            <div class="nav-user-profile">
+                <button id="btn-exit-admin" class="btn-secondary" style="margin-right: 12px; height: 32px; padding: 0 12px; font-size: 11px;">Return to App</button>
+                <div class="avatar-circle" id="top-user-avatar">
+                    <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+            </div>
+        </header>
+
+        <div class="app-layout">
+            <!-- Admin Sidebar -->
+            <aside class="sidebar">
+                <ul class="sidebar-menu">
+                    <li class="menu-item active" data-target="admin-management">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        <span class="menu-text">Ops & Admin Mgt</span>
+                    </li>
+                    <li class="menu-item" data-target="admin-traffic">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        <span class="menu-text">App Traffic</span>
+                    </li>
+                    <li class="menu-item" data-target="admin-security">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        <span class="menu-text">Vulnerabilities</span>
+                    </li>
+                    <li class="menu-item" data-target="admin-performance">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                        <span class="menu-text">System Performance</span>
+                    </li>
+                </ul>
+                <div class="sidebar-footer-card" style="border: 1px solid var(--danger); background: var(--danger-bg);">
+                    <div class="status-indicator">
+                        <span class="status-dot" style="background: var(--danger); box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);"></span>
+                        <span class="status-title" style="color: var(--danger);">Superuser Mode</span>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="main-workspace">
+                <!-- VIEW 1: OPS & ADMIN MANAGEMENT -->
+                <div id="admin-management" class="view-panel active">
+                    <div class="workspace-header">
+                        <h1>Ops & Admin Management</h1>
+                        <p class="welcome-sub">Manage platform administrators and operational managers.</p>
+                    </div>
+                    <div class="card shadow-sm">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Staff Name</th>
+                                        <th>Email</th>
+                                        <th>Privilege Level</th>
+                                        <th>Last Active</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-users-tbody">
+                                    <!-- Populated via JS -->
+                                    <tr>
+                                        <td>System Admin</td>
+                                        <td>admin@4g-capital.com</td>
+                                        <td><span class="status-badge" style="background: var(--danger-bg); color: var(--danger);">ADMIN</span></td>
+                                        <td>Just now</td>
+                                        <td><button class="btn-secondary" style="padding: 4px 8px; font-size: 10px;">Revoke</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: APP TRAFFIC -->
+                <div id="admin-traffic" class="view-panel" style="display: none;">
+                    <div class="workspace-header">
+                        <h1>App Traffic & Visitors</h1>
+                        <p class="welcome-sub">Live monitoring of user sessions and geographic distribution.</p>
+                    </div>
+                    <div class="hero-top-stack">
+                        <div class="card" style="text-align: center;">
+                            <small style="font-size: 10px; color: var(--text-muted); font-weight: 600;">ACTIVE SESSIONS</small>
+                            <h2 style="font-size: 32px; color: var(--success); margin: 8px 0;">42</h2>
+                            <span style="font-size: 11px; color: var(--success);">+12% from last hour</span>
+                        </div>
+                        <div class="card" style="text-align: center;">
+                            <small style="font-size: 10px; color: var(--text-muted); font-weight: 600;">UNIQUE VISITORS (TODAY)</small>
+                            <h2 style="font-size: 32px; color: var(--primary-blue); margin: 8px 0;">184</h2>
+                        </div>
+                    </div>
+                    <div class="card shadow-sm">
+                        <h3 style="margin-bottom: 16px;">Traffic Volume (Last 24 Hours)</h3>
+                        <div style="position: relative; height: 300px; width: 100%;">
+                            <canvas id="trafficChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 3: VULNERABILITIES -->
+                <div id="admin-security" class="view-panel" style="display: none;">
+                    <div class="workspace-header">
+                        <h1>Security & Vulnerabilities</h1>
+                        <p class="welcome-sub">Automated threat detection and authentication logs.</p>
+                    </div>
+                    <div class="dashboard-columns">
+                        <div class="card shadow-sm">
+                            <h3 style="color: var(--danger);">Failed Auth Attempts</h3>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead><tr><th>Email</th><th>IP Address</th><th>Time</th></tr></thead>
+                                    <tbody>
+                                        <tr><td>unknown@test.com</td><td>192.168.1.45</td><td>10 mins ago</td></tr>
+                                        <tr><td>staff_typo@4g-capital.com</td><td>10.0.0.22</td><td>1 hr ago</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card shadow-sm">
+                            <h3>System Security Checks</h3>
+                            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                    <strong>Google OAuth Integrity</strong>
+                                    <span class="status-badge met">Secure</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                    <strong>Redis Cache Protection</strong>
+                                    <span class="status-badge met">Secure</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                    <strong>CORS Policies</strong>
+                                    <span class="status-badge" style="background: var(--amber-bg); color: var(--amber-text);">Warning</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 4: SYSTEM PERFORMANCE -->
+                <div id="admin-performance" class="view-panel" style="display: none;">
+                    <div class="workspace-header">
+                        <h1>Overall System Performance</h1>
+                        <p class="welcome-sub">Server load, API latency, and Google Sheets sync health.</p>
+                    </div>
+                    <div class="hero-top-stack">
+                        <div class="card">
+                            <h3 class="card-sm-title">API Latency</h3>
+                            <h2 style="font-size: 24px; color: var(--text-main);">124 ms</h2>
+                            <div class="progress-bar-wrap hero-prog-wrap" style="margin-top: 8px;"><div class="progress-bar-fill" style="width: 12%; background: var(--success);"></div></div>
+                        </div>
+                        <div class="card">
+                            <h3 class="card-sm-title">Google Sheets Sync Success</h3>
+                            <h2 style="font-size: 24px; color: var(--success);">99.8%</h2>
+                            <div class="progress-bar-wrap hero-prog-wrap" style="margin-top: 8px;"><div class="progress-bar-fill" style="width: 99.8%; background: var(--success);"></div></div>
+                        </div>
+                    </div>
+                    <div class="card shadow-sm">
+                        <h3 style="margin-bottom: 16px;">Server Resource Usage</h3>
+                        <div style="position: relative; height: 300px; width: 100%;">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Floating Theme Toggle -->
+    <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme">
+        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+
+    <script>
+        // Set User Profile Picture
+        const currentUser = JSON.parse(sessionStorage.getItem('upia_user'));
+        if (currentUser && currentUser.picture) {
+            document.getElementById('top-user-avatar').innerHTML = `<img src="${currentUser.picture}" alt="Admin" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+        }
+
+        // Return to App Button
+        document.getElementById('btn-exit-admin').addEventListener('click', () => {
+            window.location.href = '/overview';
+        });
+
+        // Admin Sidebar Tab Switching
+        const menuItems = document.querySelectorAll('.sidebar-menu .menu-item');
+        const viewPanels = document.querySelectorAll('.view-panel');
+
+        menuItems.forEach(item => {
+            item.addEventListener('click', () => {
+                menuItems.forEach(m => m.classList.remove('active'));
+                viewPanels.forEach(p => p.style.display = 'none');
+                
+                item.classList.add('active');
+                document.getElementById(item.getAttribute('data-target')).style.display = 'block';
+            });
+        });
+
+        // Initialize Charts (Mocked Data for UI setup)
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        };
+
+        // Traffic Chart
+        const ctxTraffic = document.getElementById('trafficChart').getContext('2d');
+        new Chart(ctxTraffic, {
+            type: 'line',
+            data: {
+                labels: ['12am', '4am', '8am', '12pm', '4pm', '8pm', 'Now'],
+                datasets: [{
+                    label: 'Active Users',
+                    data: [12, 8, 45, 89, 120, 65, 42],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: commonOptions
+        });
+
+        // Performance Chart
+        const ctxPerf = document.getElementById('performanceChart').getContext('2d');
+        new Chart(ctxPerf, {
+            type: 'bar',
+            data: {
+                labels: ['CPU Load', 'Memory Usage', 'DB Latency', 'Cache Hit Rate'],
+                datasets: [{
+                    label: 'System Metrics (%)',
+                    data: [35, 62, 15, 94],
+                    backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'],
+                    borderRadius: 4
+                }]
+            },
+            options: commonOptions
+        });
+    </script>
+</body>
+</html>

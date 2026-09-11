@@ -80,99 +80,133 @@ def auth_google():
         sheet_id = app.config.get('SHEET_ID')
         bonus_config = get_cached_config(sheet_id)
         
-        if bonus_config and 'staff' in bonus_config:
+        if bonus_config:
             staff_data = bonus_config.get('staff', {})
             performance_data = bonus_config.get('performance', {})
+            management_data = bonus_config.get('management', {}) 
 
             print(f"DEBUG: Trying to log in with -> {email}")
-            print(f"DEBUG: Authorized emails found -> {list(staff_data.keys())}")
             
-            if email in staff_data:
-                # Copy dictionary to avoid mutating cached Redis config object in memory
-                user_info = dict(staff_data[email])
+            is_staff = email in staff_data
+            is_mgmt = email in management_data
+            
+            if is_staff or is_mgmt:
+                
+                # 1. Build Base User Object
+                if is_mgmt and not is_staff:
+                    mgmt_user = dict(management_data[email])
+                    user_info = {
+                        "name": mgmt_user.get("name", email.split("@")[0].replace('.', ' ').title()),
+                        "email": email,
+                        "branch": mgmt_user.get("branch", "HQ"),
+                        "type": mgmt_user.get("role", "Ops Manager"),
+                        "id": mgmt_user.get("id", "MGT"),
+                        "pairs": "0",
+                        "is_ops": True
+                    }
+                else:
+                    user_info = dict(staff_data[email])
+                    user_info['is_ops'] = is_mgmt
+                
                 user_info['picture'] = idinfo.get('picture', '')
+                user_info['performance'] = {}
                 
                 user_branch = str(user_info.get('branch', '')).strip().lower()
                 emp_type = str(user_info.get('type', '')).strip().upper()
                 
-                is_bm = "BM" in emp_type or "MANAGER" in emp_type
-                user_info['performance'] = {}
-                
-                print(f"DEBUG: Looking for Branch -> '{user_branch}'")
-                print(f"DEBUG: Actual Performance Keys from Sheet -> {list(performance_data.keys())[:5]}")
-                
-                if is_bm:
-                    branch_prefix = f"{user_branch}_"
-                    agg_data = {}
-                    
-                    for key, metrics in performance_data.items():
-                        if key.startswith(branch_prefix):
-                            parts = key.split('_')
-                            if len(parts) >= 3:
-                                month_code = parts[-1]
-                                
-                                if month_code not in agg_data:
-                                    agg_data[month_code] = {
-                                        "count": 0,
-                                        "disb_target": 0.0, "disb_actual": 0.0, "disb_rate": 0.0,
-                                        "ac_target": 0.0, "ac_actual": 0.0, "ac_rate": 0.0,
-                                        "nc_target": 0.0, "nc_actual": 0.0, "nc_rate": 0.0,
-                                        "overall_otc": 0.0, "dd7_rate": 0.0, "new_customer_otc": 0.0
-                                    }
-                                
-                                m = agg_data[month_code]
-                                m["count"] += 1
-                                
-                                m["disb_target"] += metrics.get("disb_target", 0)
-                                m["disb_actual"] += metrics.get("disb_actual", 0)
-                                m["disb_rate"] += metrics.get("disb_rate", 0)
-                                m["ac_target"] += metrics.get("ac_target", 0)
-                                m["ac_actual"] += metrics.get("ac_actual", 0)
-                                m["ac_rate"] += metrics.get("ac_rate", 0)
-                                m["nc_target"] += metrics.get("nc_target", 0)
-                                m["nc_actual"] += metrics.get("nc_actual", 0)
-                                m["nc_rate"] += metrics.get("nc_rate", 0)
-                                m["overall_otc"] += metrics.get("overall_otc", 0)
-                                m["dd7_rate"] += metrics.get("dd7_rate", 0)
-                                m["new_customer_otc"] += metrics.get("new_customer_otc", 0)
-                    
-                    for month_code, agg in agg_data.items():
-                        c = agg["count"]
-                        if c > 0:
-                            user_info['performance'][month_code] = {
-                                "disb_target": agg["disb_target"],
-                                "disb_actual": agg["disb_actual"],
-                                "disb_rate": agg["disb_rate"] / c,
-                                "ac_target": agg["ac_target"],
-                                "ac_actual": agg["ac_actual"],
-                                "ac_rate": agg["ac_rate"] / c,
-                                "nc_target": agg["nc_target"],
-                                "nc_actual": agg["nc_actual"],
-                                "nc_rate": agg["nc_rate"] / c,
-                                "overall_otc": agg["overall_otc"] / c,
-                                "dd7_rate": agg["dd7_rate"] / c,
-                                "new_customer_otc": agg["new_customer_otc"] / c
-                            }
-                else:
-                    user_pair_raw = str(user_info.get('pairs', '1')).strip().lower()
-                    if user_pair_raw in ['1', '']: user_pair_raw = 'pair 1'
-                    elif user_pair_raw == '2': user_pair_raw = 'pair 2'
-                    elif user_pair_raw == '3': user_pair_raw = 'pair 3'
-                        
-                    prefix = f"{user_branch}_{user_pair_raw}_"
-                    for key, metrics in performance_data.items():
-                        if key.startswith(prefix):
-                            parts = key.split('_')
-                            month_code = parts[-1]
-                            user_info['performance'][month_code] = metrics
+                # Assign Admin Role if applicable
+                if is_mgmt and "ADMIN" in str(management_data[email].get('role', emp_type)).strip().upper():
+                    user_info['type'] = "System Admin"
+                    emp_type = "ADMIN"
 
-                return jsonify({'success': True, 'user': user_info})
+                # 2. Skip Performance Calculation for Ops/Admins
+                if not user_info.get('is_ops'):
+                    is_bm = "BM" in emp_type or "MANAGER" in emp_type
+                    
+                    if is_bm:
+                        branch_prefix = f"{user_branch}_"
+                        agg_data = {}
+                        
+                        for key, metrics in performance_data.items():
+                            if key.startswith(branch_prefix):
+                                parts = key.split('_')
+                                if len(parts) >= 3:
+                                    month_code = parts[-1]
+                                    
+                                    if month_code not in agg_data:
+                                        agg_data[month_code] = {
+                                            "count": 0,
+                                            "disb_target": 0.0, "disb_actual": 0.0, "disb_rate": 0.0,
+                                            "ac_target": 0.0, "ac_actual": 0.0, "ac_rate": 0.0,
+                                            "nc_target": 0.0, "nc_actual": 0.0, "nc_rate": 0.0,
+                                            "overall_otc": 0.0, "dd7_rate": 0.0, "new_customer_otc": 0.0
+                                        }
+                                    
+                                    m = agg_data[month_code]
+                                    m["count"] += 1
+                                    
+                                    m["disb_target"] += metrics.get("disb_target", 0)
+                                    m["disb_actual"] += metrics.get("disb_actual", 0)
+                                    m["disb_rate"] += metrics.get("disb_rate", 0)
+                                    m["ac_target"] += metrics.get("ac_target", 0)
+                                    m["ac_actual"] += metrics.get("ac_actual", 0)
+                                    m["ac_rate"] += metrics.get("ac_rate", 0)
+                                    m["nc_target"] += metrics.get("nc_target", 0)
+                                    m["nc_actual"] += metrics.get("nc_actual", 0)
+                                    m["nc_rate"] += metrics.get("nc_rate", 0)
+                                    m["overall_otc"] += metrics.get("overall_otc", 0)
+                                    m["dd7_rate"] += metrics.get("dd7_rate", 0)
+                                    m["new_customer_otc"] += metrics.get("new_customer_otc", 0)
+                        
+                        for month_code, agg in agg_data.items():
+                            c = agg["count"]
+                            if c > 0:
+                                user_info['performance'][month_code] = {
+                                    "disb_target": agg["disb_target"],
+                                    "disb_actual": agg["disb_actual"],
+                                    "disb_rate": agg["disb_rate"] / c,
+                                    "ac_target": agg["ac_target"],
+                                    "ac_actual": agg["ac_actual"],
+                                    "ac_rate": agg["ac_rate"] / c,
+                                    "nc_target": agg["nc_target"],
+                                    "nc_actual": agg["nc_actual"],
+                                    "nc_rate": agg["nc_rate"] / c,
+                                    "overall_otc": agg["overall_otc"] / c,
+                                    "dd7_rate": agg["dd7_rate"] / c,
+                                    "new_customer_otc": agg["new_customer_otc"] / c
+                                }
+                    else:
+                        user_pair_raw = str(user_info.get('pairs', '1')).strip().lower()
+                        if user_pair_raw in ['1', '']: user_pair_raw = 'pair 1'
+                        elif user_pair_raw == '2': user_pair_raw = 'pair 2'
+                        elif user_pair_raw == '3': user_pair_raw = 'pair 3'
+                            
+                        prefix = f"{user_branch}_{user_pair_raw}_"
+                        for key, metrics in performance_data.items():
+                            if key.startswith(prefix):
+                                parts = key.split('_')
+                                month_code = parts[-1]
+                                user_info['performance'][month_code] = metrics
+
+                # 3. Build Final Payload
+                response_payload = {
+                    'success': True, 
+                    'user': user_info
+                }
+
+                # Attach global data strictly for Ops/Admins
+                if user_info.get('is_ops'):
+                    sorted_staff = sorted(staff_data.values(), key=lambda x: x.get('name', ''))
+                    response_payload['all_staff'] = sorted_staff
+                    response_payload['raw_performance'] = performance_data 
+
+                return jsonify(response_payload)
                 
         return jsonify({'success': False, 'error': 'Email not authorized for UPIA Bonus.'}), 401
 
     except ValueError:
         return jsonify({'success': False, 'error': 'Invalid Google session.'}), 401
-
+    
 def sanitize_floats(obj):
     """Recursively converts Python Infinity and NaN into JSON-safe None (null)."""
     if isinstance(obj, dict):
@@ -232,7 +266,12 @@ def reload_config():
         return jsonify({"success": True, "message": "Configuration reloaded and Redis Cache updated successfully."})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-
+@app.route('/admin')
+def admin_dashboard():
+    # In a fully session-backed app, you would verify an admin token here.
+    # Since we are using client-side sessionStorage, the page will verify on load.
+    return render_template('admin.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
+    

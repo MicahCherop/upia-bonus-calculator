@@ -23,15 +23,19 @@ def calculate_bonus(data, config):
 
     # 1. Eligibility Check
     criteria = config.get('criteria', {})
-    disb_ok = float(data.get('disbursement', 0)) >= criteria.get('disbursement', 0.98)
-    ac_ok = float(data.get('active_customers', 0)) >= criteria.get('active_customers', 0.95)
-    nc_ok = float(data.get('new_customers', 0)) >= criteria.get('new_customers', 0.95)
-    otc_ok = float(data.get('otc', 0)) >= criteria.get('otc', 0.915)
-    dd7_ok = float(data.get('dd7', 0)) >= criteria.get('dd7', 0.94)
-    new_otc_ok = float(data.get('new_customer_otc', 0)) >= criteria.get('new_customer_otc', 0.90)
+    
+    # Safely round to prevent float distortion failures (e.g., 0.97999 < 0.98)
+    disb_ok = round(float(data.get('disbursement', 0)), 4) >= criteria.get('disbursement', 0.98)
+    ac_ok = round(float(data.get('active_customers', 0)), 4) >= criteria.get('active_customers', 0.95)
+    nc_ok = round(float(data.get('new_customers', 0)), 4) >= criteria.get('new_customers', 0.95)
+    otc_ok = round(float(data.get('otc', 0)), 4) >= criteria.get('otc', 0.915)
+    dd7_ok = round(float(data.get('dd7', 0)), 4) >= criteria.get('dd7', 0.94)
+    new_otc_ok = round(float(data.get('new_customer_otc', 0)), 4) >= criteria.get('new_customer_otc', 0.90)
 
     full_bonus = disb_ok and ac_ok and nc_ok and otc_ok and dd7_ok and new_otc_ok
-    collection_bonus_45 = (not full_bonus) and (otc_ok and dd7_ok)
+    
+    # FIX: Ensure New Customer OTC is strictly enforced for the Collection Bonus
+    collection_bonus_45 = (not full_bonus) and (otc_ok and dd7_ok and new_otc_ok)
 
     eligibility = {
         "full_bonus": full_bonus,
@@ -58,16 +62,28 @@ def calculate_bonus(data, config):
 
     if bands:
         for idx, band in enumerate(bands):
-            if customers <= band['max']:
+            if customers <= band.get('max', float('inf')):
                 current_band = band['name']
                 
                 # Dynamically set display boundaries for UI
-                current_max = band['max']
-                current_min = 0 if idx == 0 else bands[idx - 1]['max'] + 1
+                current_max = band.get('max', float('inf'))
+                current_min = 0 if idx == 0 else bands[idx - 1].get('max', 0) + 1
 
-                # Fetch Multipliers (handling BM distinct values vs LOCO single values)
+                # Fetch Multipliers 
                 full_mult = band.get('full_mult', band.get('multiplier', 0.0))
-                partial_mult = band.get('partial_mult', full_mult * 0.45)
+                
+                # FIX: Set exact 45% Collection logic mapping for Loan/Collection Officers
+                if is_bm:
+                    partial_mult = band.get('partial_mult', full_mult * 0.45)
+                else:
+                    if current_max <= 200:
+                        partial_mult = 0.25
+                    elif current_max <= 350:
+                        partial_mult = 0.30
+                    elif current_max <= 500:
+                        partial_mult = 0.45
+                    else:
+                        partial_mult = 0.50
 
                 display_multiplier = full_mult # Shows the maximum potential of the band on the UI
 
@@ -90,7 +106,19 @@ def calculate_bonus(data, config):
                     cust_needed = next_min - customers if next_min > customers else 0
 
                     next_full_mult = next_b.get('full_mult', next_b.get('multiplier', 0.0))
-                    next_partial_mult = next_b.get('partial_mult', next_full_mult * 0.45)
+                    
+                    # FIX: Predict Next Band Partial Multipliers properly for LO/COs
+                    if is_bm:
+                        next_partial_mult = next_b.get('partial_mult', next_full_mult * 0.45)
+                    else:
+                        if next_max <= 200:
+                            next_partial_mult = 0.25
+                        elif next_max <= 350:
+                            next_partial_mult = 0.30
+                        elif next_max <= 500:
+                            next_partial_mult = 0.45
+                        else:
+                            next_partial_mult = 0.50
 
                     pot_bonus = 0.0
                     if full_bonus:
@@ -101,9 +129,14 @@ def calculate_bonus(data, config):
                     curr_bonus = salary * active_multiplier
                     opp = pot_bonus - curr_bonus
 
-                    min_thresh_math = 0 if idx == 0 else bands[idx - 1]['max']
-                    denom = band['max'] - min_thresh_math
-                    prog = ((customers - min_thresh_math) / denom * 100) if denom > 0 else 100
+                    min_thresh_math = 0 if idx == 0 else bands[idx - 1].get('max', 0)
+                    denom = current_max - min_thresh_math
+                    
+                    if denom == float('inf') or denom <= 0:
+                        prog = 100
+                    else:
+                        prog = ((customers - min_thresh_math) / denom * 100)
+                        
                     prog = min(max(prog, 0), 100)
 
                     next_band_info = {
@@ -135,7 +168,7 @@ def calculate_bonus(data, config):
 
         target_row = None
         for row in upside_table:
-            if row['min'] <= disb_actual <= row['max']:
+            if row.get('min', 0) <= disb_actual <= row.get('max', float('inf')):
                 target_row = row
                 break
 
@@ -144,7 +177,8 @@ def calculate_bonus(data, config):
 
         if target_row:
             best_payout = 0.0
-            for thresh, amt in target_row['payouts'].items():
+            for thresh_str, amt in target_row.get('payouts', {}).items():
+                thresh = float(thresh_str)
                 if dd7_val >= (thresh - 0.0001):
                     if amt > best_payout:
                         best_payout = amt
@@ -165,7 +199,6 @@ def calculate_bonus(data, config):
             "upside": collection_upside
         }
     }
-
 def evaluate_criteria(data, criteria_targets):
     results = []
     for key, target in criteria_targets.items():

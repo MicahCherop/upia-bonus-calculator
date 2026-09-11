@@ -24,9 +24,38 @@ def load_configuration(sheet_id):
             "bm_bands": _parse_bm_bands(),
             "collection_upside": _parse_collections(fetch_csv_rows(sheet_id, 'Collections upside')),
             "staff": _parse_staff_list(fetch_csv_rows(sheet_id, 'Staff_List')),
-            "performance": _parse_performance(fetch_csv_rows(sheet_id, 'Performance'))
+            "performance": _parse_performance(fetch_csv_rows(sheet_id, 'Performance')),
+            "management": {}  # Initialize empty dictionary
         }
+        
+        # ---------------------------------------------------------
+        # Fetch the Management Sheet using your custom helper
+        # ---------------------------------------------------------
+        try:
+            management_rows = fetch_csv_rows(sheet_id, 'Management')
+
+            # Skip the header row (index 0)
+            for row in management_rows[1:]:
+                if len(row) >= 3:
+                    name = str(row[0]).strip()
+                    email = str(row[1]).strip().lower()
+                    role = str(row[2]).strip().upper()
+                    
+                    if email:
+                        config["management"][email] = {
+                            "name": name,
+                            "email": email,
+                            "role": role,
+                            "branch": "HQ",  
+                            "id": "MGT",     
+                            "type": role     
+                        }
+        except Exception as e:
+            print(f"Warning: Could not fetch Management sheet data. Error: {e}")
+        # ---------------------------------------------------------
+        
         return config
+
     except Exception as e:
         print(f"Error reading Google Sheet config: {e}")
         return _get_fallback_config()

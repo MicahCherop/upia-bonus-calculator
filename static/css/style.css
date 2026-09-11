@@ -755,3 +755,40 @@ input::-webkit-inner-spin-button {
     font-weight: 600 !important;
     line-height: 1 !important;
 }
+/* ==========================================
+   OPS MANAGER TABS & LIST
+   ========================================== */
+.ops-tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 4px;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.ops-tab-btn:hover { color: var(--text-main); }
+.ops-tab-btn.active {
+    color: var(--primary-blue);
+    border-bottom: 2px solid var(--primary-blue);
+}
+
+.btn-view-staff {
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    color: var(--primary-blue);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-view-staff:hover {
+    background: var(--primary-blue);
+    color: #fff;
+}
+[data-theme="dark"] .btn-view-staff { background: #334155; }
+[data-theme="dark"] .btn-view-staff:hover { background: var(--primary-blue); }
