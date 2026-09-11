@@ -792,3 +792,170 @@ input::-webkit-inner-spin-button {
 }
 [data-theme="dark"] .btn-view-staff { background: #334155; }
 [data-theme="dark"] .btn-view-staff:hover { background: var(--primary-blue); }
+/* =========================================================
+   1. GLOBAL FONT SIZE INCREASES 
+========================================================= */
+
+/* Bump the base font size for the entire application */
+body {
+    font-size: 15px;
+}
+
+/* Increase specific text elements for better hierarchy */
+h1 { font-size: 26px; }
+h2 { font-size: 22px; }
+h3 { font-size: 16px; }
+p, .welcome-sub { font-size: 15px; }
+
+/* Sidebar and Navigation Text */
+.menu-text { font-size: 15px; }
+.status-title { font-size: 15px; }
+.status-sub, #last-updated-text { font-size: 13px; }
+
+/* Dashboard Cards & Inputs */
+.slim-info-item small, .inner-stat small, .inner-stat-box small { 
+    font-size: 12px; 
+    letter-spacing: 0.5px;
+}
+.table-input, select { font-size: 15px; }
+.btn-primary, .btn-secondary, .ops-tab-btn { font-size: 15px; }
+
+
+/* =========================================================
+   2. STAFF DIRECTORY & TABLE ENHANCEMENTS
+========================================================= */
+
+/* Modernize the Table Container */
+.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 15px; /* Increased table font */
+}
+
+/* Styled, prominent table headers */
+.data-table th {
+    background-color: var(--bg-color);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    padding: 16px;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Spacious Table Cells */
+.data-table td {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+    vertical-align: middle;
+}
+
+/* Interactive Row Hover Effect (Zebra/Highlight) */
+.data-table tbody tr {
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.data-table tbody tr:hover {
+    background-color: rgba(59, 130, 246, 0.06); /* Soft blue highlight */
+}
+
+[data-theme='dark'] .data-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05); /* Soft light highlight for dark mode */
+}
+
+/* Beautiful Action Buttons for the Directory */
+.btn-view-staff {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-view-staff:hover {
+    background: #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Search Box Polish */
+#ops-search-input {
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 10px 16px;
+    font-size: 15px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#ops-search-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    outline: none;
+}
+/* =========================================================
+   3. PAGINATION CONTROLS & BOTTOM NAVIGATION
+========================================================= */
+
+/* Override inline styles for the container text */
+.pagination-controls label, 
+.pagination-controls span {
+    font-size: 14px !important;
+    color: var(--text-color) !important;
+    font-weight: 500 !important;
+}
+
+/* Styled Rows per page Dropdown */
+#ops-page-size {
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 6px 12px !important;
+    font-size: 14px !important;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+#ops-page-size:hover, #ops-page-size:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Beautiful Prev & Next Buttons */
+.pagination-controls .btn-secondary {
+    background-color: var(--bg-color) !important;
+    color: var(--text-color) !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 6px 16px !important;
+    font-size: 14px !important;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.pagination-controls .btn-secondary:hover {
+    background-color: rgba(59, 130, 246, 0.05) !important;
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+}
+
+.pagination-controls .btn-secondary:active {
+    transform: translateY(1px);
+}

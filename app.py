@@ -8,10 +8,12 @@ from google.auth.transport import requests
 from services.config_loader import load_configuration
 from services.bonus_engine import calculate_bonus
 from dotenv import load_dotenv
+from flask_compress import Compress
 
 load_dotenv()
 
 app = Flask(__name__)
+Compress(app)
 
 # Initialize Redis connection (Gracefully handles missing URL during local dev)
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
@@ -35,8 +37,8 @@ def get_cached_config(sheet_id):
     fresh_config = load_configuration(sheet_id)
     
     try:
-        # 3. Save to Redis with a 5-minute (300 seconds) expiration
-        redis_client.setex(cache_key, 300, json.dumps(fresh_config))
+        # 3. Save to Redis with a 4-hour (14400 seconds) expiration
+        redis_client.setex(cache_key, 14400, json.dumps(fresh_config))
         print("DEBUG: Successfully saved fresh config to Redis.")
     except Exception as e:
         print(f"DEBUG: Redis Write Error: {e}")

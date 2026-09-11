@@ -7,11 +7,34 @@
     <link rel="icon" type="image/jpeg" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
     </script>
+    <style>
+        /* Skeleton Animation Styles */
+        .skeleton {
+            background-color: #e2e5e7;
+            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
+            background-size: 200px 100%;
+            background-repeat: no-repeat;
+            border-radius: 4px;
+            animation: shimmer 1.5s infinite linear;
+        }
+        [data-theme='dark'] .skeleton {
+            background-color: #374151;
+            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+        }
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
+        }
+        .skel-text { height: 16px; width: 100%; margin: 4px 0; }
+        .skel-text-short { height: 16px; width: 60%; margin: 4px 0; }
+        .skel-btn { height: 28px; width: 110px; border-radius: 4px; }
+        .skel-kpi { height: 36px; width: 40%; margin-top: 12px; }
+        .skel-chart { height: 260px; width: 100%; margin-top: 16px; border-radius: 8px; }
+    </style>
 </head>
 <body>
     <div id="app-wrapper">
@@ -36,8 +59,7 @@
         <div class="app-layout">
             <aside class="sidebar">
                 <ul class="sidebar-menu">
-                    <!-- Dynamic Nav Item: Becomes 'Overview' for Ops, 'Dashboard' for Staff -->
-                    <li class="menu-item" data-view="dashboard" id="main-nav-item">
+                    <li class="menu-item active" data-view="dashboard" id="main-nav-item">
                         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                         <span class="menu-text">Dashboard</span>
                     </li>
@@ -67,8 +89,8 @@
                     <button id="btn-exit-impersonation" style="background: rgba(0,0,0,0.2); border: none; color: #fff; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: 600;">End View & Return</button>
                 </div>
                 
-                <!-- VIEW 1: DASHBOARD (STAFF) -->
-                <div id="view-dashboard" class="view-panel" style="display: none;">
+                <!-- VIEW 1: DASHBOARD -->
+                <div id="view-dashboard" class="view-panel active">
                     <div class="workspace-header">
                         <div>
                             <h1 class="welcome-title">Welcome back, <span id="hero-user-firstname">User</span></h1>
@@ -239,7 +261,18 @@
                                             <th>Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="ops-staff-tbody">
+                                    
+                                    <!-- SKELETON STAFF LOADER -->
+                                    <tbody id="skeleton-staff-tbody">
+                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
+                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
+                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
+                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
+                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
+                                    </tbody>
+
+                                    <!-- ACTUAL LOADED CONTENT -->
+                                    <tbody id="ops-staff-tbody" style="display: none;">
                                         <!-- JS populates this list -->
                                     </tbody>
                                 </table>
@@ -267,14 +300,81 @@
                         </div>
                     </div>
 
-                    <!-- TAB CONTENT 2: ANALYTICS -->
+                    <!-- TAB CONTENT 2: ANALYTICS WITH KPIs & DUAL CHARTS -->
                     <div id="ops-analytics" class="ops-tab-content" style="display: none;">
-                        <div class="card shadow-sm">
-                            <h3 style="margin-bottom: 16px;">Network Bonus & Band Distribution</h3>
-                            <div style="position: relative; height: 350px; width: 100%;">
-                                <canvas id="opsAnalyticsChart"></canvas>
+                        
+                        <!-- SKELETON ANALYTICS LOADER -->
+                        <div id="ops-analytics-skeleton">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                                <div class="card shadow-sm"><div class="skeleton skel-text-short"></div><div class="skeleton skel-kpi"></div></div>
+                                <div class="card shadow-sm"><div class="skeleton skel-text-short"></div><div class="skeleton skel-kpi"></div></div>
+                                <div class="card shadow-sm"><div class="skeleton skel-text-short"></div><div class="skeleton skel-kpi"></div></div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+                                <div class="card shadow-sm"><div class="skeleton skel-text-short"></div><div class="skeleton skel-chart"></div></div>
+                                <div class="card shadow-sm"><div class="skeleton skel-text-short"></div><div class="skeleton skel-chart"></div></div>
                             </div>
                         </div>
+
+                        <!-- ACTUAL LOADED ANALYTICS CONTENT -->
+                        <div id="ops-analytics-content" style="display: none;">
+                            <!-- KPI CARDS -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                                <div class="card shadow-sm kpi-card" id="kpi-card-full" style="padding: 16px; cursor: pointer; border: 1px solid var(--border-color); transition: all 0.2s;">
+                                    <small style="color: var(--text-muted); font-weight: 600;">Full Bonus Qualified <span class="kpi-month-label"></span></small>
+                                    <h2 id="kpi-full-bonus" style="margin-top: 8px; font-size: 28px; color: #10b981;">0</h2>
+                                </div>
+                                <div class="card shadow-sm kpi-card" id="kpi-card-partial" style="padding: 16px; cursor: pointer; border: 1px solid var(--border-color); transition: all 0.2s;">
+                                    <small style="color: var(--text-muted); font-weight: 600;">45% Collection Bonus <span class="kpi-month-label"></span></small>
+                                    <h2 id="kpi-partial-bonus" style="margin-top: 8px; font-size: 28px; color: #f59e0b;">0</h2>
+                                </div>
+                                <div class="card shadow-sm kpi-card" id="kpi-card-missed" style="padding: 16px; cursor: pointer; border: 1px solid var(--border-color); transition: all 0.2s;">
+                                    <small style="color: var(--text-muted); font-weight: 600;">Did Not Qualify <span class="kpi-month-label"></span></small>
+                                    <h2 id="kpi-missed-bonus" style="margin-top: 8px; font-size: 28px; color: #ef4444;">0</h2>
+                                </div>
+                            </div>
+
+                            <!-- 2-COLUMN CHART LAYOUT -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+                                <div class="card shadow-sm">
+                                    <h3 style="margin-bottom: 16px; font-size: 14px;">Bonus Qualification Trend</h3>
+                                    <div style="position: relative; height: 300px; width: 100%;">
+                                        <canvas id="opsBonusChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="card shadow-sm">
+                                    <h3 style="margin-bottom: 16px; font-size: 14px;">Band Distribution (Qualified Staff)</h3>
+                                    <div style="position: relative; height: 300px; width: 100%;">
+                                        <canvas id="opsBandChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- DYNAMIC FILTERED STAFF LIST (Hidden by Default) -->
+                            <div id="kpi-staff-list-container" class="card shadow-sm" style="display: none; margin-top: 20px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <h3 id="kpi-staff-list-title" style="font-size: 14px;">Filtered Staff</h3>
+                                    <button id="close-kpi-list-btn" class="btn-secondary" style="padding: 4px 8px; font-size: 12px;">Close List</button>
+                                </div>
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="data-table">
+                                        <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 10;">
+                                            <tr>
+                                                <th>Staff Name</th>
+                                                <th>Branch</th>
+                                                <th>Role</th>
+                                                <th>Customers</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="kpi-staff-tbody">
+                                            <!-- JS populates this list -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -289,25 +389,57 @@
 
     <!-- Details Modal -->
     <div id="mobile-profile-modal" class="profile-modal-overlay">
-        <div class="profile-modal-card">
-            <div class="profile-modal-header">
-                <h3>User Profile</h3>
+        <div class="profile-modal-card" style="max-width: 360px; padding: 0;">
+            <div class="profile-modal-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px; margin-bottom: 0;">
+                <h3 style="margin: 0; font-size: 16px;">User Profile</h3>
                 <button id="close-profile-modal" class="modal-close-btn">&times;</button>
             </div>
-            <div class="profile-modal-body">
-                <div class="modal-detail-item"><small>Full Name</small><strong id="modal-emp-name">-</strong></div>
-                <div class="modal-detail-item"><small>Staff ID</small><strong id="modal-emp-id">-</strong></div>
-                <div class="modal-detail-item"><small>Role</small><strong id="modal-emp-role">-</strong></div>
-                <div class="modal-detail-item"><small>Branch</small><strong id="modal-emp-branch">-</strong></div>
-                <div class="modal-detail-item"><small>Pairs</small><strong id="modal-emp-pairs">-</strong></div>
-                <div class="modal-detail-item"><small>Email</small><strong id="modal-emp-email">-</strong></div>
+            
+            <!-- Centered Avatar Container -->
+            <div style="display: flex; justify-content: center; padding: 24px 0 16px;">
+                <div id="modal-user-avatar-wrap" style="width: 84px; height: 84px; border-radius: 50%; background: var(--bg-color); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid var(--border-color); box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; color: var(--text-muted);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
             </div>
-            <button id="btn-logout-drawer" class="drawer-logout-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> Sign Out
-            </button>
+
+            <!-- Neatly arranged 2-Column Grid -->
+            <div class="profile-modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; padding: 0 24px 24px;">
+                <div class="modal-detail-item" style="margin: 0;">
+                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Full Name</small>
+                    <strong id="modal-emp-name" style="font-size: 14px;">-</strong>
+                </div>
+                <div class="modal-detail-item" style="margin: 0;">
+                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Staff ID</small>
+                    <strong id="modal-emp-id" style="font-size: 14px;">-</strong>
+                </div>
+                <div class="modal-detail-item" style="margin: 0;">
+                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Role</small>
+                    <strong id="modal-emp-role" style="font-size: 14px;">-</strong>
+                </div>
+                <div class="modal-detail-item" style="margin: 0;">
+                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Branch</small>
+                    <strong id="modal-emp-branch" style="font-size: 14px;">-</strong>
+                </div>
+                <div class="modal-detail-item" style="margin: 0;">
+                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Pairs</small>
+                    <strong id="modal-emp-pairs" style="font-size: 14px;">-</strong>
+                </div>
+                <div class="modal-detail-item" style="grid-column: span 2; margin: 0;">
+                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Email</small>
+                    <strong id="modal-emp-email" style="font-size: 14px; word-break: break-all;">-</strong>
+                </div>
+            </div>
+            
+            <!-- Styled Logout Button matching screenshot -->
+            <div style="padding: 0 24px 24px;">
+                <button id="btn-logout-drawer" class="drawer-logout-btn" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 10px; background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> Sign Out
+                </button>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script id="staff-data-json" type="application/json">{{ employees_json | safe }}</script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
