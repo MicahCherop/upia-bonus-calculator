@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Portal | UPIA</title>
-    <link rel="icon" type="image/jpeg" href="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B">
+    <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='icon.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.png') }}">
     <script>
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -27,7 +29,7 @@
         <!-- Admin Top Navbar -->
         <header class="top-navbar" style="border-bottom: 2px solid var(--danger);">
             <div class="nav-brand" style="display: flex; align-items: center; gap: 8px;">
-                <img src="https://cdn.brandfetch.io/idkNTof4f-/w/400/h/400/theme/dark/icon.jpeg?c=1dxbfHSJFAPEGdCLU4o5B" alt="UPIA Logo" style="width: 24px; height: 24px; border-radius: 6px; object-fit: cover;">
+                <img src="{{ url_for('static', filename='icon.png') }}" alt="UPIA Logo" style="width: 24px; height: 24px; border-radius: 6px; object-fit: cover;">
                 <span class="logo-text">UPIA <strong style="color: var(--danger); margin-left: 4px;">ADMIN</strong></span>
             </div>
             <div class="nav-user-profile">
@@ -198,7 +200,7 @@
     <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme">
         <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
     </button>
-
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Set User Profile Picture
         const currentUser = JSON.parse(sessionStorage.getItem('upia_user'));

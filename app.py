@@ -9,11 +9,17 @@ from services.config_loader import load_configuration
 from services.bonus_engine import calculate_bonus
 from dotenv import load_dotenv
 from flask_compress import Compress
+from flask import send_from_directory
 
 load_dotenv()
 
 app = Flask(__name__)
 Compress(app)
+
+@app.route('/sw.js')
+def serve_sw():
+    # Serves the sw.js file from the static folder but routes it to the root URL
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
 
 # Initialize Redis connection (Gracefully handles missing URL during local dev)
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')

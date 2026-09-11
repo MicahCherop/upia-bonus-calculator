@@ -852,3 +852,57 @@ function renderGoogleButton() {
 
 window.addEventListener('load', () => setTimeout(renderGoogleButton, 300));
 document.getElementById('theme-toggle-btn')?.addEventListener('click', () => setTimeout(renderGoogleButton, 50));
+
+// =========================================================
+// PWA SERVICE WORKER & INSTALLATION LOGIC
+// =========================================================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('PWA Service Worker registered successfully.'))
+            .catch(err => console.error('PWA Service Worker registration failed:', err));
+    });
+}
+
+let deferredPrompt;
+const installBtn = document.getElementById('pwa-install-btn');
+
+// Capture the install prompt from the browser
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing automatically on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later.
+    deferredPrompt = e;
+    
+    // Show our custom FAB button
+    if (installBtn) {
+        installBtn.style.display = 'flex';
+    }
+});
+
+// Trigger the installation when the FAB is clicked
+if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            // Show the native browser install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User install outcome: ${outcome}`);
+            
+            // We've used the prompt, throw it away
+            deferredPrompt = null;
+            // Hide the button since they've interacted with it
+            installBtn.style.display = 'none';
+        }
+    });
+}
+
+// Listen for successful installation to hide the button permanently
+window.addEventListener('appinstalled', () => {
+    if (installBtn) {
+        installBtn.style.display = 'none';
+    }
+    deferredPrompt = null;
+    console.log('PWA installed successfully.');
+});
