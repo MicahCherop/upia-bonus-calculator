@@ -5,4 +5,8 @@ google-auth-oauthlib==1.2.0
 python-dotenv==1.0.1
 redis==5.0.4
 gunicorn==22.0.0
-Flask-Compress
+Flask-Compress==1.13
+Flask-WTF==1.1.1
+Flask-Login==0.6.2
+Flask-Bcrypt==1.0.1
+Flask-Caching==2.3.0
