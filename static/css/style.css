@@ -985,3 +985,98 @@ p, .welcome-sub { font-size: 15px; }
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
 }
+/* ==========================================
+   DASHBOARD SCROLL LOCK (STICKY HEADER & SIDEBAR)
+   ========================================== */
+
+/* 1. Stop the main browser window from scrolling */
+body {
+    overflow: hidden !important;
+}
+
+/* 2. Force the wrapper to take exactly 100% of the screen height */
+#app-wrapper {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 3. Keep the header at its exact height */
+.top-navbar {
+    flex-shrink: 0;
+    z-index: 100;
+}
+
+/* 4. Allow the layout area to fill the remaining space */
+.app-layout {
+    flex-grow: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* 5. Allow sidebar to scroll independently if menu gets long on small screens */
+.sidebar {
+    height: 100%;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+/* 6. Make ONLY the main workspace scrollable */
+.main-workspace {
+    height: 100%;
+    overflow-y: auto;
+    flex-grow: 1;
+    scroll-behavior: smooth;
+}
+/* ==========================================
+   MOBILE LAYOUT FIX (RESTORE CONTENT & BOTTOM NAV)
+   ========================================== */
+@media (max-width: 768px) {
+    /* 1. Stack main content on top and navigation bar at the bottom */
+    .app-layout {
+        flex-direction: column-reverse !important;
+        height: calc(100vh - 56px) !important; /* Account for top navbar */
+        overflow: hidden !important;
+    }
+
+    /* 2. Restrict mobile sidebar to a fixed bottom navigation height */
+    .sidebar {
+        height: 60px !important;
+        width: 100% !important;
+        flex-shrink: 0 !important;
+        overflow: visible !important;
+    }
+
+    /* 3. Force main workspace to occupy all remaining screen space and scroll */
+    .main-workspace {
+        flex: 1 1 auto !important;
+        height: calc(100% - 60px) !important;
+        overflow-y: auto !important;
+        padding-bottom: 32px !important;
+    }
+}
+/* ==========================================
+   HIDE SCROLLBARS & FULL-WIDTH WORKSPACE
+   ========================================== */
+
+/* 1. Expand workspace to full container width */
+.main-workspace {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    box-sizing: border-box !important;
+    /* Hide scrollbars for WebKit (Chrome, Safari) & Firefox while retaining scroll function */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 2. Hide WebKit scrollbars globally across scrollable elements */
+.main-workspace::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar,
+#chat-messages::-webkit-scrollbar,
+#ops-ticket-list::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}

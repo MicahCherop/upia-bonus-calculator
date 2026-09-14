@@ -2,35 +2,38 @@ import os
 import json
 import math
 import redis
-from flask import Flask, request, jsonify, render_template
+import time
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from services.config_loader import load_configuration
 from services.bonus_engine import calculate_bonus
 from dotenv import load_dotenv
 from flask_compress import Compress
-from flask import send_from_directory
+from flask_caching import Cache
 
 load_dotenv()
 
+# 1. Initialize Flask & Extensions Once
 app = Flask(__name__)
 Compress(app)
 
-@app.route('/sw.js')
-def serve_sw():
-    # Serves the sw.js file from the static folder but routes it to the root URL
-    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+app.config['CACHE_TYPE'] = 'SimpleCache'  
+app.config['CACHE_DEFAULT_TIMEOUT'] = 600  # Hold data in memory for 10 minutes
 
-# Initialize Redis connection (Gracefully handles missing URL during local dev)
+cache = Cache(app)
+
+# Initialize Redis connection
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
-# decode_responses=True ensures we get clean strings instead of byte objects
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
+# 2. Apply In-Memory Caching directly to the Config Loader
+@cache.memoize(timeout=600)
 def get_cached_config(sheet_id):
     cache_key = f"upia_bonus_config_{sheet_id}"
     
     try:
-        # 1. Try to fetch from Redis
+        # Layer 2: Try to fetch from Redis
         cached_data = redis_client.get(cache_key)
         if cached_data:
             print("DEBUG: Serving config from Redis Cache!")
@@ -38,12 +41,12 @@ def get_cached_config(sheet_id):
     except Exception as e:
         print(f"DEBUG: Redis Read Error (falling back to Google): {e}")
 
-    # 2. Cache Miss: Fetch fresh data from Google Sheets
+    # Layer 3: Cache Miss - Fetch fresh data from Google Sheets
     print("DEBUG: Cache miss. Fetching fresh data from Google Sheets...")
     fresh_config = load_configuration(sheet_id)
     
     try:
-        # 3. Save to Redis with a 4-hour (14400 seconds) expiration
+        # Save to Redis with a 4-hour (14400 seconds) expiration
         redis_client.setex(cache_key, 14400, json.dumps(fresh_config))
         print("DEBUG: Successfully saved fresh config to Redis.")
     except Exception as e:
@@ -51,13 +54,12 @@ def get_cached_config(sheet_id):
         
     return fresh_config
 
-
-# 1. Set the exact Sheet ID as the permanent fallback right here
+# Set the exact Sheet ID as the permanent fallback
 app.config['SHEET_ID'] = os.environ.get('SHEET_ID', '1NXN8rBdusXSNQg3zbSNbxmPvb7vIiQ3vtq79lFcNi1o')
 GOOGLE_CLIENT_ID = "85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com"
 
 try:
-    # 2. Use the Redis Cache function to prevent Vercel Cold Starts from rate-limiting Google
+    # Pre-load configuration on boot
     app.config['BONUS_CONFIG'] = get_cached_config(app.config['SHEET_ID'])
     app.config['CONFIG_STATUS'] = "Google Sheet Synced ✓"
 except Exception as e:
@@ -65,15 +67,25 @@ except Exception as e:
     app.config['CONFIG_STATUS'] = f"Failed: {str(e)}"
 
 
+@app.route('/sw.js')
+def serve_sw():
+    return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 @app.route('/overview')
 def overview():
     return render_template('overview.html')
 
+@app.route('/band-guide')
+def band_guide():
+    return render_template('band-guide.html')
+
+@app.route('/help')
+def help_page():
+    return render_template('help.html')
 
 @app.route('/api/auth/google', methods=['POST'])
 def auth_google():
@@ -84,7 +96,6 @@ def auth_google():
         idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
         email = idinfo['email'].lower()
         
-        # Pull from Redis Cache
         sheet_id = app.config.get('SHEET_ID')
         bonus_config = get_cached_config(sheet_id)
         
@@ -132,7 +143,6 @@ def auth_google():
                     is_bm = "BM" in emp_type or "MANAGER" in emp_type
                     
                     if is_bm:
-                        # Fetch BM specific performance data directly without averaging
                         bm_performance_data = bonus_config.get('bm_performance', {})
                         for key, metrics in bm_performance_data.items():
                             parts = key.split('_')
@@ -140,7 +150,6 @@ def auth_google():
                                 month_code = parts[1]
                                 user_info['performance'][month_code] = metrics
                     else:
-                        # Fetch standard LOCO performance data
                         user_pair_raw = str(user_info.get('pairs', '1')).strip().lower()
                         if user_pair_raw in ['1', '']: user_pair_raw = 'pair 1'
                         elif user_pair_raw == '2': user_pair_raw = 'pair 2'
@@ -164,7 +173,6 @@ def auth_google():
                     sorted_staff = sorted(staff_data.values(), key=lambda x: x.get('name', ''))
                     response_payload['all_staff'] = sorted_staff
                     
-                    # Merge both performance sheets so Ops can impersonate ANY role seamlessly
                     merged_perf = {**bonus_config.get("performance", {}), **bonus_config.get("bm_performance", {})}
                     response_payload['raw_performance'] = merged_perf 
 
@@ -190,7 +198,6 @@ def sanitize_floats(obj):
 @app.route('/api/calculate', methods=['POST'])
 def calculate():
     if not app.config.get('BONUS_CONFIG'):
-        # Fallback fetch if the global cache failed on boot
         app.config['BONUS_CONFIG'] = get_cached_config(app.config.get('SHEET_ID'))
         if not app.config.get('BONUS_CONFIG'):
             return jsonify({"success": False, "error": "Configuration not loaded. Check Google Sheet ID/Permissions."}), 500
@@ -216,30 +223,80 @@ def calculate():
 @app.route('/api/config/reload', methods=['POST'])
 def reload_config():
     try:
-        # Force a bypass of the Redis Cache and fetch directly from Google Sheets
         sheet_id = app.config['SHEET_ID']
-        fresh_config = load_configuration(sheet_id)
         
-        # Update the local app state
+        # 1. Clear the In-Memory RAM Cache
+        cache.delete_memoized(get_cached_config, sheet_id)
+        
+        # 2. Fetch fresh from Google Sheets
+        fresh_config = load_configuration(sheet_id)
         app.config['BONUS_CONFIG'] = fresh_config
         app.config['CONFIG_STATUS'] = "Google Sheet Synced ✓"
         
-        # Manually overwrite the Redis Cache
+        # 3. Manually overwrite the Redis Cache
         cache_key = f"upia_bonus_config_{sheet_id}"
         try:
-            redis_client.setex(cache_key, 300, json.dumps(fresh_config))
+            redis_client.setex(cache_key, 14400, json.dumps(fresh_config))
         except Exception as e:
             print(f"DEBUG: Redis Overwrite Error: {e}")
 
-        return jsonify({"success": True, "message": "Configuration reloaded and Redis Cache updated successfully."})
+        return jsonify({"success": True, "message": "Configuration reloaded and all caches updated successfully."})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/admin')
 def admin_dashboard():
-    # In a fully session-backed app, you would verify an admin token here.
-    # Since we are using client-side sessionStorage, the page will verify on load.
     return render_template('admin.html')
+
+@app.route('/api/chat/sync', methods=['POST'])
+def sync_chat():
+    try:
+        data = request.json
+        user_email = data.get('email', '').lower()
+        is_ops = data.get('is_ops', False)
+        new_message = data.get('message', '').strip()
+        target_email = data.get('target_email', '').lower() # Used when Ops replies to a specific staff member
+
+        # We will store all chats in a single Redis Hash named 'upia_chats'
+        # Key: Staff Email -> Value: JSON list of message objects
+        all_chats = redis_client.hgetall('upia_chats')
+        
+        # 1. Handle Sending a New Message
+        if new_message:
+            msg_obj = {
+                "sender": "ops" if is_ops else "staff",
+                "text": new_message,
+                "timestamp": int(time.time()),
+                "read": False
+            }
+            
+            # Determine which chat thread to update
+            thread_key = target_email if is_ops else user_email
+            
+            # Load existing thread or create new
+            existing_thread = all_chats.get(thread_key)
+            thread_data = json.loads(existing_thread) if existing_thread else []
+            thread_data.append(msg_obj)
+            
+            # Save back to Redis
+            redis_client.hset('upia_chats', thread_key, json.dumps(thread_data))
+            # Refresh our local variable so the response includes the new message
+            all_chats[thread_key] = json.dumps(thread_data)
+
+        # 2. Return Data based on Role
+        if is_ops:
+            # Ops Manager gets ALL chats across the whole branch
+            parsed_chats = {email: json.loads(msgs) for email, msgs in all_chats.items()}
+            return jsonify({"success": True, "chats": parsed_chats})
+        else:
+            # Staff only gets THEIR specific chat thread
+            my_thread = all_chats.get(user_email)
+            parsed_my_thread = json.loads(my_thread) if my_thread else []
+            return jsonify({"success": True, "chats": parsed_my_thread})
+            
+    except Exception as e:
+        print(f"Chat Sync Error: {e}")
+        return jsonify({"success": False, "error": "Failed to sync chat."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

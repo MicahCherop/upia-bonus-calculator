@@ -102,11 +102,16 @@
         };
 
         const handleNavigation = (targetView) => {
+            if (!targetView) return;
+            const activePanel = document.getElementById(`view-${targetView}`);
+            
+            // Safety check: If the panel doesn't exist on this HTML page, stop here!
+            if (!activePanel) return; 
+
             document.querySelectorAll('.view-panel').forEach(panel => panel.style.display = 'none');
             document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
 
-            const activePanel = document.getElementById(`view-${targetView}`);
-            if (activePanel) activePanel.style.display = 'block';
+            activePanel.style.display = 'block';
 
             const sidebarItem = document.querySelector(`.menu-item[data-view="${targetView}"]`);
             if (sidebarItem) sidebarItem.classList.add('active');
@@ -759,7 +764,23 @@
         });
 
         document.querySelectorAll('.menu-item').forEach(item => {
-            item.addEventListener('click', () => handleNavigation(item.getAttribute('data-view')));
+            item.addEventListener('click', () => {
+                const view = item.getAttribute('data-view');
+                const href = item.getAttribute('data-href');
+                
+                // 1. If the panel exists on the current page, just switch to it
+                if (view && document.getElementById(`view-${view}`)) {
+                    handleNavigation(view);
+                } 
+                // 2. Otherwise, if there is a link, go to the new page
+                else if (href) {
+                    window.location.href = href;
+                } 
+                // 3. Fallback: If it's a Dashboard/Ops button but we aren't on the overview page
+                else if (view === 'dashboard' || view === 'ops') {
+                    window.location.href = '/overview';
+                }
+            });
         });
 
         document.querySelectorAll('.metric-row').forEach(row => {
@@ -900,6 +921,244 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.error('PWA Service Worker registration failed:', err));
     });
 }
+
+// ==========================================
+// UNIFIED SIDEBAR TICKETING SYSTEM
+// ==========================================
+let chatSyncInterval = null;
+let currentOpsChatTarget = null;
+
+const initChatSystem = () => {
+    const userStr = sessionStorage.getItem('upia_user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
+    const openChatBtn = document.getElementById('open-chat-btn');
+    const chatDrawer = document.getElementById('chat-drawer');
+    const chatOverlay = document.getElementById('chat-drawer-overlay');
+    const closeChatBtn = document.getElementById('close-chat-btn');
+    const chatBackBtn = document.getElementById('chat-back-btn');
+
+    // 1. Handle Opening the Drawer
+    if (openChatBtn && chatDrawer) {
+        openChatBtn.addEventListener('click', () => {
+            chatDrawer.classList.add('open');
+            if (chatOverlay) chatOverlay.classList.add('show');
+            
+            // Configure view based on role
+            const ticketList = document.getElementById('ops-ticket-list');
+            const threadView = document.getElementById('chat-thread-view');
+            
+            if (user.is_ops) {
+                currentOpsChatTarget = null; // Reset target on fresh open
+                if (ticketList) ticketList.style.display = 'block';
+                if (threadView) threadView.style.display = 'none';
+                document.getElementById('chat-header-title').textContent = 'Support Tickets';
+                if (chatBackBtn) chatBackBtn.style.display = 'none';
+            } else {
+                if (ticketList) ticketList.style.display = 'none';
+                if (threadView) threadView.style.display = 'flex';
+                document.getElementById('chat-header-title').textContent = 'Support Chat';
+            }
+            
+            syncChatData(); // Fetch instantly
+        });
+    }
+
+    // 2. Handle Closing the Drawer
+    const closeDrawer = () => {
+        if (chatDrawer) chatDrawer.classList.remove('open');
+        if (chatOverlay) chatOverlay.classList.remove('show');
+    };
+    if (closeChatBtn) closeChatBtn.addEventListener('click', closeDrawer);
+    if (chatOverlay) chatOverlay.addEventListener('click', closeDrawer);
+
+    // 3. Handle Ops "Back" Button
+    if (chatBackBtn) {
+        chatBackBtn.addEventListener('click', () => {
+            currentOpsChatTarget = null;
+            const ticketList = document.getElementById('ops-ticket-list');
+            const threadView = document.getElementById('chat-thread-view');
+            
+            if (ticketList) ticketList.style.display = 'block';
+            if (threadView) threadView.style.display = 'none';
+            chatBackBtn.style.display = 'none';
+            document.getElementById('chat-header-title').textContent = 'Support Tickets';
+        });
+    }
+
+    // 4. Send Message Binding (Universal Input for both Staff & Ops)
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    const chatInput = document.getElementById('chat-input');
+    if (chatSendBtn && chatInput) {
+        chatSendBtn.addEventListener('click', () => sendChatMessage(chatInput.value, currentOpsChatTarget));
+        chatInput.addEventListener('keypress', (e) => { 
+            if(e.key === 'Enter') sendChatMessage(chatInput.value, currentOpsChatTarget); 
+        });
+    }
+
+    // Background polling (checks for new messages every 5 seconds)
+    if (chatSyncInterval) clearInterval(chatSyncInterval);
+    chatSyncInterval = setInterval(syncChatData, 5000);
+};
+
+const sendChatMessage = async (msgText, targetEmail = null) => {
+    if (!msgText.trim()) return;
+    const user = JSON.parse(sessionStorage.getItem('upia_user'));
+    
+    // Clear the input field instantly
+    const inputField = document.getElementById('chat-input');
+    if (inputField) inputField.value = '';
+
+    try {
+        const res = await fetch('/api/chat/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: user.email,
+                name: user.name, // Sending Name for Audit
+                is_ops: user.is_ops,
+                message: msgText,
+                target_email: targetEmail
+            })
+        });
+        const data = await res.json();
+        if (data.success) renderChatUI(data.chats, user);
+    } catch (e) {
+        console.error("Chat send failed", e);
+    }
+};
+
+const syncChatData = async () => {
+    const userStr = sessionStorage.getItem('upia_user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
+    // Save bandwidth: Only sync if the side drawer is actually open
+    const drawerOpen = document.getElementById('chat-drawer')?.classList.contains('open');
+    if (!drawerOpen) return; 
+
+    try {
+        const res = await fetch('/api/chat/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: user.email, is_ops: user.is_ops })
+        });
+        const data = await res.json();
+        if (data.success) renderChatUI(data.chats, user);
+    } catch (e) {
+        console.error("Chat sync failed", e);
+    }
+};
+
+const renderChatUI = (chatData, user) => {
+    
+    // Helper function to format timestamp beautifully
+    const formatTime = (ts) => {
+        return new Date(ts * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const renderMessages = (messagesArray, viewerIsOps) => {
+        const msgContainer = document.getElementById('chat-messages');
+        if (!msgContainer) return;
+        
+        msgContainer.innerHTML = '';
+        if (!messagesArray || messagesArray.length === 0) {
+            msgContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 13px; margin-top: 30px;">No messages yet.<br>Type below to start the conversation!</div>';
+            return;
+        }
+
+        messagesArray.forEach(msg => {
+            const isMe = (viewerIsOps && msg.sender_role === 'ops') || (!viewerIsOps && msg.sender_role === 'staff');
+            
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = `display: flex; flex-direction: column; max-width: 85%; ${isMe ? 'align-self: flex-end;' : 'align-self: flex-start;'}`;
+            
+            const auditHeader = document.createElement('div');
+            auditHeader.style.cssText = `font-size: 10.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; ${isMe ? 'text-align: right;' : 'text-align: left;'}`;
+            auditHeader.textContent = `${msg.sender_name} (${msg.sender_role === 'ops' ? 'Admin/Ops' : 'Staff'}) • ${formatTime(msg.timestamp)}`;
+            
+            const bubble = document.createElement('div');
+            bubble.style.cssText = `padding: 12px 16px; border-radius: 12px; line-height: 1.4; ${isMe ? 'background: var(--primary-color); color: white; border-bottom-right-radius: 4px;' : 'background: #e2e8f0; color: #1e293b; border-bottom-left-radius: 4px;'}`;
+            
+            if (!isMe && document.documentElement.getAttribute('data-theme') === 'dark') {
+                bubble.style.background = '#334155';
+                bubble.style.color = '#f8fafc';
+            }
+            
+            bubble.textContent = msg.text;
+            
+            wrapper.appendChild(auditHeader);
+            wrapper.appendChild(bubble);
+            msgContainer.appendChild(wrapper);
+        });
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    };
+
+    if (!user.is_ops) {
+        // Render Staff View
+        renderMessages(chatData, false);
+    } else {
+        // Render Ops Ticket List
+        const threadList = document.getElementById('ops-ticket-list');
+        if (threadList) {
+            threadList.innerHTML = '';
+            
+            // Sort chats by most recent message
+            const sortedChats = Object.entries(chatData).sort((a, b) => {
+                const lastA = a[1].length > 0 ? a[1][a[1].length - 1].timestamp : 0;
+                const lastB = b[1].length > 0 ? b[1][b[1].length - 1].timestamp : 0;
+                return lastB - lastA;
+            });
+
+            if (sortedChats.length === 0) {
+                threadList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No support tickets found.</div>';
+            }
+
+            sortedChats.forEach(([email, msgs]) => {
+                if (msgs.length === 0) return;
+                
+                const lastMsg = msgs[msgs.length - 1];
+                const threadEl = document.createElement('div');
+                
+                threadEl.style.cssText = `padding: 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;`;
+                
+                // Detailed Preview Audit
+                const previewPrefix = lastMsg.sender_role === 'ops' 
+                    ? `<strong style="color: var(--primary-color);">${lastMsg.sender_name}:</strong> ` 
+                    : `<strong style="color: #f59e0b;">Action Required:</strong> `;
+
+                threadEl.innerHTML = `
+                    <div style="font-weight: 600; font-size: 14px; color: var(--text-color); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${email}</div>
+                    <div style="font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        ${previewPrefix} ${lastMsg.text}
+                    </div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px;">Last updated: ${formatTime(lastMsg.timestamp)}</div>
+                `;
+                
+                threadEl.addEventListener('click', () => {
+                    currentOpsChatTarget = email;
+                    document.getElementById('ops-ticket-list').style.display = 'none';
+                    document.getElementById('chat-thread-view').style.display = 'flex';
+                    document.getElementById('chat-back-btn').style.display = 'inline-block';
+                    document.getElementById('chat-header-title').textContent = "Ticket: " + email;
+                    
+                    renderMessages(chatData[email], true);
+                });
+                
+                threadList.appendChild(threadEl);
+            });
+        }
+        
+        // Re-render active thread if Ops is actively chatting
+        if (currentOpsChatTarget && chatData[currentOpsChatTarget]) {
+            renderMessages(chatData[currentOpsChatTarget], true);
+        }
+    }
+};
+
+// Initialize
+setTimeout(initChatSystem, 1500);
 
 let deferredPrompt;
 const installBtn = document.getElementById('pwa-install-btn');

@@ -15,27 +15,11 @@
         document.documentElement.setAttribute('data-theme', savedTheme);
     </script>
     <style>
-        /* Skeleton Animation Styles */
-        .skeleton {
-            background-color: #e2e5e7;
-            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
-            background-size: 200px 100%;
-            background-repeat: no-repeat;
-            border-radius: 4px;
-            animation: shimmer 1.5s infinite linear;
-        }
-        [data-theme='dark'] .skeleton {
-            background-color: #374151;
-            background-image: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
-        }
-        @keyframes shimmer {
-            0% { background-position: -200px 0; }
-            100% { background-position: calc(200px + 100%) 0; }
-        }
-        .skel-text { height: 16px; width: 100%; margin: 4px 0; }
-        .skel-text-short { height: 16px; width: 60%; margin: 4px 0; }
-        .skel-btn { height: 28px; width: 110px; border-radius: 4px; }
-        .skel-kpi { height: 36px; width: 40%; margin-top: 12px; }
+        .skeleton { background-color: #e2e5e7; background-image: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0)); background-size: 200px 100%; background-repeat: no-repeat; border-radius: 4px; animation: shimmer 1.5s infinite linear; }
+        [data-theme='dark'] .skeleton { background-color: #374151; background-image: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0)); }
+        @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: calc(200px + 100%) 0; } }
+        .skel-text { height: 16px; width: 100%; margin: 4px 0; } .skel-text-short { height: 16px; width: 60%; margin: 4px 0; }
+        .skel-btn { height: 28px; width: 110px; border-radius: 4px; } .skel-kpi { height: 36px; width: 40%; margin-top: 12px; }
         .skel-chart { height: 260px; width: 100%; margin-top: 16px; border-radius: 8px; }
     </style>
 </head>
@@ -60,25 +44,22 @@
         <div class="app-layout">
             <aside class="sidebar">
                 <ul class="sidebar-menu">
+                    <!-- FIX: overview.html MUST use data-view="dashboard" because the panel is natively on this page -->
                     <li class="menu-item active" data-view="dashboard" id="main-nav-item">
                         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
                         <span class="menu-text">Dashboard</span>
                     </li>
-                    <li class="menu-item" data-view="band-guide">
-                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <li class="menu-item" data-href="/band-guide">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
                         <span class="menu-text">Band Guide</span>
                     </li>
-                    <li class="menu-item" data-view="help">
+                    <li class="menu-item" data-href="/help">
                         <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                        <span class="menu-text">Help</span>
-                    </li>
+                        <span class="menu-text">Help & Support</span>
+                    </li>                    
                 </ul>
-
                 <div class="sidebar-footer-card">
-                    <div class="status-indicator">
-                        <span class="status-dot green"></span>
-                        <span class="status-title">Configuration</span>
-                    </div>
+                    <div class="status-indicator"><span class="status-dot green"></span><span class="status-title">Configuration</span></div>
                     <p class="status-sub">System Loaded</p>
                     <small id="last-updated-text" style="color: var(--text-muted)">Live tracking active</small>
                 </div>
@@ -107,16 +88,10 @@
                         <div class="slim-info-section">
                             <div class="slim-info-item"><small>Employee Name</small><strong id="emp-info-name">-</strong></div>
                             <div class="slim-info-item"><small>Staff ID</small><strong id="emp-info-id">-</strong></div>
-                            <div class="slim-info-item">
-                                <small>BRANCH</small>
-                                <strong id="emp-info-branch" style="font-size: 16px; color: var(--text-color);">-</strong>
-                            </div>                            
+                            <div class="slim-info-item"><small>Branch</small><strong id="emp-info-branch">-</strong></div>                            
                             <div class="slim-info-item"><small>Role</small><strong id="emp-info-role">-</strong></div>
                             <div class="slim-info-item"><small>Pairs</small><strong id="emp-info-pairs">-</strong></div>
-                            <div class="slim-info-item">
-                                <small>Base Salary</small>
-                                <strong id="emp-info-salary" style="font-size: 16px; color: var(--text-color);">KSh 0</strong>
-                            </div>                            
+                            <div class="slim-info-item"><small>Base Salary</small><strong id="emp-info-salary" style="font-size: 16px; color: var(--text-color);">KSh 0</strong></div>                            
                         </div>
                         <div class="slim-eligibility-section">
                             <small>ELIGIBILITY STATUS</small>
@@ -141,15 +116,9 @@
 
                         <div class="card hero-next-band-card">
                             <h3 class="card-sm-title">NEXT BAND OPPORTUNITY</h3>
-                            <div class="band-transition-text">
-                                <span id="hero-curr-band">Growth</span> &rarr; <strong id="hero-next-band" class="text-amber">Tension</strong>
-                            </div>
-                            <div class="progress-bar-wrap hero-prog-wrap">
-                                <div class="progress-bar-fill" id="res-prog-fill" style="width: 0%;"></div>
-                            </div>
-                            <div class="progress-meta right-align">
-                                <span id="res-prog-text">0 / 0 customers total</span>
-                            </div>
+                            <div class="band-transition-text"><span id="hero-curr-band">Growth</span> &rarr; <strong id="hero-next-band" class="text-amber">Tension</strong></div>
+                            <div class="progress-bar-wrap hero-prog-wrap"><div class="progress-bar-fill" id="res-prog-fill" style="width: 0%;"></div></div>
+                            <div class="progress-meta right-align"><span id="res-prog-text">0 / 0 customers total</span></div>
                             <div class="opportunity-inner-grid">
                                 <div class="inner-stat-box"><small>CUSTOMERS NEEDED</small><h4 id="res-cust-needed">0</h4></div>
                                 <div class="inner-stat-box"><small>POTENTIAL EARNINGS</small><h4 id="res-pot-earnings">KSh 0</h4></div>
@@ -169,26 +138,19 @@
                                 <div class="table-responsive">
                                     <table class="data-table metrics-interactive-table">
                                         <thead>
-                                            <tr>
-                                                <th>Metric</th><th>Target</th><th>Achieved</th><th><span class="name-full">Difference</span><span class="name-abbr">Diff.</span></th><th>Status</th>
-                                            </tr>
+                                            <tr><th>Metric</th><th>Target</th><th>Achieved</th><th><span class="name-full">Difference</span><span class="name-abbr">Diff.</span></th><th>Status</th></tr>
                                         </thead>
                                         <tbody>
                                             <tr class="metric-row" data-metric="disbursement"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">Disbursement Rate</span><span class="name-abbr">Disb. Rate</span></td><td>98.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="disbursement" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-disbursement" class="diff-val">+0.0%</td><td id="status-disbursement"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-disbursement"><td colspan="5"><div class="metric-details-box"><span>Actual Disbursed: <strong id="fig-disb-actual">KSh 0</strong></span><span>Target: <strong id="fig-disb-target">KSh 0</strong></span></div></td></tr>
-
                                             <tr class="metric-row" data-metric="active_customers"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">Active Customers %</span><span class="name-abbr">Active Cust. %</span></td><td>95.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="active_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-active-customers" class="diff-val">+0.0%</td><td id="status-active-customers"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-active_customers"><td colspan="5"><div class="metric-details-box"><span>Active Customers: <strong id="fig-ac-actual">0</strong></span><span>Target: <strong id="fig-ac-target">0</strong></span></div></td></tr>
-
                                             <tr class="metric-row" data-metric="new_customers"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">New Customers %</span><span class="name-abbr">New Cust. %</span></td><td>95.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="new_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-new-customers" class="diff-val">0.0%</td><td id="status-new-customers"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-new_customers"><td colspan="5"><div class="metric-details-box"><span>New Customers: <strong id="fig-nc-actual">0</strong></span><span>Target: <strong id="fig-nc-target">0</strong></span></div></td></tr>
-
                                             <tr class="metric-row" data-metric="otc"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">OTC Rate</span><span class="name-abbr">OTC Rate</span></td><td>91.50%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="otc" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-otc" class="diff-val">+0.0%</td><td id="status-otc"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-otc"><td colspan="5"><div class="metric-details-box"><span>Overall OTC Rate: <strong id="fig-otc-val">0.0%</strong></span></div></td></tr>
-
                                             <tr class="metric-row" data-metric="dd7"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">DD+7 Rate</span><span class="name-abbr">DD+7 Rate</span></td><td>94.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="dd7" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-dd7" class="diff-val">+0.0%</td><td id="status-dd7"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-dd7"><td colspan="5"><div class="metric-details-box"><span>DD+7 Rate: <strong id="fig-dd7-val">0.0%</strong></span></div></td></tr>
-
                                             <tr class="metric-row" data-metric="new_customer_otc"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">New Customer OTC</span><span class="name-abbr">New Cust. OTC</span></td><td>90.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="new_customer_otc" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-new-cust-otc" class="diff-val">+0.0%</td><td id="status-new-cust-otc"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-new_customer_otc"><td colspan="5"><div class="metric-details-box"><span>New Customer OTC: <strong id="fig-new-otc-val">0.0%</strong></span></div></td></tr>
                                         </tbody>
@@ -196,39 +158,6 @@
                                 </div>
                             </form>
                         </div>
-                    </div>
-                </div>
-
-                <!-- VIEW 2: BAND GUIDE -->
-                <div id="view-band-guide" class="view-panel" style="display: none;">
-                    <div class="workspace-header">
-                        <h1>Band Guide & Multipliers</h1>
-                        <p class="welcome-sub">Overview of performance tiers and associated reward multipliers.</p>
-                    </div>
-                    <div class="card shadow-sm">
-                        <table class="data-table">
-                            <thead><tr><th>Band Level</th><th>Customer Threshold</th><th>Multiplier</th></tr></thead>
-                            <tbody>
-                                <tr><td>Floor</td><td>&lt; 250</td><td>0.8x</td></tr>
-                                <tr><td>Baseline</td><td>250 - 350</td><td>1.2x</td></tr>
-                                <tr><td>Growth</td><td>351 - 450</td><td>1.3x</td></tr>
-                                <tr><td>Tension</td><td>451 - 550</td><td>1.6x</td></tr>
-                                <tr><td>Pre-Elite</td><td>551 - 700</td><td>1.8x</td></tr>
-                                <tr><td>Elite</td><td>701+</td><td>2.0x</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- VIEW 3: HELP -->
-                <div id="view-help" class="view-panel" style="display: none;">
-                    <div class="workspace-header">
-                        <h1>Help & Support</h1>
-                        <p class="welcome-sub">Frequently Asked Questions and assistance.</p>
-                    </div>
-                    <div class="card shadow-sm">
-                        <h3>How is my bonus calculated?</h3>
-                        <p>Your bonus is computed using your customer band multiplier combined with your target performance criteria (Disbursement, Active Customers, OTC, DD+7).</p>
                     </div>
                 </div>
 
@@ -249,46 +178,26 @@
                         </div>
                     </div>
 
-                    <!-- TAB CONTENT 1: STAFF LIST WITH PAGINATION -->
                     <div id="ops-staff-list" class="ops-tab-content active">
                         <div class="card shadow-sm" style="padding: 0; display: flex; flex-direction: column; height: calc(100vh - 230px);">
                             <div class="table-responsive" style="flex-grow: 1; overflow-y: auto;">
                                 <table class="data-table" id="ops-staff-table">
                                     <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 10;">
-                                        <tr>
-                                            <th>Staff Name</th>
-                                            <th>Branch</th>
-                                            <th>Pair</th>
-                                            <th>Role</th>
-                                            <th>Action</th>
-                                        </tr>
+                                        <tr><th>Staff Name</th><th>Branch</th><th>Pair</th><th>Role</th><th>Action</th></tr>
                                     </thead>
-                                    
-                                    <!-- SKELETON STAFF LOADER -->
                                     <tbody id="skeleton-staff-tbody">
                                         <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
                                         <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
-                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
-                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
-                                        <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
                                     </tbody>
-
-                                    <!-- ACTUAL LOADED CONTENT -->
-                                    <tbody id="ops-staff-tbody" style="display: none;">
-                                        <!-- JS populates this list -->
-                                    </tbody>
+                                    <tbody id="ops-staff-tbody" style="display: none;"></tbody>
                                 </table>
                             </div>
                             
-                            <!-- Pagination Controls -->
                             <div class="pagination-controls" style="padding: 12px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); border-radius: 0 0 var(--radius-md) var(--radius-md);">
                                 <div class="page-size-wrap">
                                     <label for="ops-page-size" style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">Rows per page:</label>
                                     <select id="ops-page-size" class="table-input" style="width: auto; padding: 4px 8px; font-size: 12px;">
-                                        <option value="25" selected>25</option>
-                                        <option value="50">50</option>
-                                        <option value="100">100</option>
-                                        <option value="300">300</option>
+                                        <option value="25" selected>25</option><option value="50">50</option><option value="100">100</option><option value="300">300</option>
                                     </select>
                                 </div>
                                 <div class="page-nav-wrap" style="display: flex; align-items: center; gap: 16px;">
@@ -302,10 +211,7 @@
                         </div>
                     </div>
 
-                    <!-- TAB CONTENT 2: ANALYTICS WITH KPIs & DUAL CHARTS -->
                     <div id="ops-analytics" class="ops-tab-content" style="display: none;">
-                        
-                        <!-- SKELETON ANALYTICS LOADER -->
                         <div id="ops-analytics-skeleton">
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
                                 <div class="card shadow-sm"><div class="skeleton skel-text-short"></div><div class="skeleton skel-kpi"></div></div>
@@ -318,9 +224,7 @@
                             </div>
                         </div>
 
-                        <!-- ACTUAL LOADED ANALYTICS CONTENT -->
                         <div id="ops-analytics-content" style="display: none;">
-                            <!-- KPI CARDS -->
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
                                 <div class="card shadow-sm kpi-card" id="kpi-card-full" style="padding: 16px; cursor: pointer; border: 1px solid var(--border-color); transition: all 0.2s;">
                                     <small style="color: var(--text-muted); font-weight: 600;">Full Bonus Qualified <span class="kpi-month-label"></span></small>
@@ -336,23 +240,17 @@
                                 </div>
                             </div>
 
-                            <!-- 2-COLUMN CHART LAYOUT -->
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
                                 <div class="card shadow-sm">
                                     <h3 style="margin-bottom: 16px; font-size: 14px;">Bonus Qualification Trend</h3>
-                                    <div style="position: relative; height: 300px; width: 100%;">
-                                        <canvas id="opsBonusChart"></canvas>
-                                    </div>
+                                    <div style="position: relative; height: 300px; width: 100%;"><canvas id="opsBonusChart"></canvas></div>
                                 </div>
                                 <div class="card shadow-sm">
                                     <h3 style="margin-bottom: 16px; font-size: 14px;">Band Distribution (Qualified Staff)</h3>
-                                    <div style="position: relative; height: 300px; width: 100%;">
-                                        <canvas id="opsBandChart"></canvas>
-                                    </div>
+                                    <div style="position: relative; height: 300px; width: 100%;"><canvas id="opsBandChart"></canvas></div>
                                 </div>
                             </div>
 
-                            <!-- DYNAMIC FILTERED STAFF LIST (Hidden by Default) -->
                             <div id="kpi-staff-list-container" class="card shadow-sm" style="display: none; margin-top: 20px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                                     <h3 id="kpi-staff-list-title" style="font-size: 14px;">Filtered Staff</h3>
@@ -361,17 +259,9 @@
                                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                                     <table class="data-table">
                                         <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 10;">
-                                            <tr>
-                                                <th>Staff Name</th>
-                                                <th>Branch</th>
-                                                <th>Role</th>
-                                                <th>Customers</th>
-                                                <th>Action</th>
-                                            </tr>
+                                            <tr><th>Staff Name</th><th>Branch</th><th>Role</th><th>Customers</th><th>Action</th></tr>
                                         </thead>
-                                        <tbody id="kpi-staff-tbody">
-                                            <!-- JS populates this list -->
-                                        </tbody>
+                                        <tbody id="kpi-staff-tbody"></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -384,68 +274,29 @@
         </div>
     </div>
 
-    <!-- Floating Theme Toggle -->
-    <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme">
-        <svg id="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-    </button>
+    <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme"></button>
+    <button id="pwa-install-btn" class="fab-install-btn" aria-label="Install App" style="display: none;">Install App</button>
 
-    <!-- PWA Install FAB (Bottom Left) -->
-    <button id="pwa-install-btn" class="fab-install-btn" aria-label="Install App" style="display: none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; margin-right: 8px;">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-        Install App
-    </button>
-
-    <!-- Details Modal -->
     <div id="mobile-profile-modal" class="profile-modal-overlay">
         <div class="profile-modal-card" style="max-width: 360px; padding: 0;">
             <div class="profile-modal-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px; margin-bottom: 0;">
                 <h3 style="margin: 0; font-size: 16px;">User Profile</h3>
                 <button id="close-profile-modal" class="modal-close-btn">&times;</button>
             </div>
-            
-            <!-- Centered Avatar Container -->
             <div style="display: flex; justify-content: center; padding: 24px 0 16px;">
-                <div id="modal-user-avatar-wrap" style="width: 84px; height: 84px; border-radius: 50%; background: var(--bg-color); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid var(--border-color); box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                    <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; color: var(--text-muted);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                </div>
+                <div id="modal-user-avatar-wrap" style="width: 84px; height: 84px; border-radius: 50%; background: var(--bg-color); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid var(--border-color); box-shadow: 0 4px 6px rgba(0,0,0,0.05);"></div>
             </div>
-
-            <!-- Neatly arranged 2-Column Grid -->
             <div class="profile-modal-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; padding: 0 24px 24px;">
-                <div class="modal-detail-item" style="margin: 0;">
-                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Full Name</small>
-                    <strong id="modal-emp-name" style="font-size: 14px;">-</strong>
-                </div>
-                <div class="modal-detail-item" style="margin: 0;">
-                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Staff ID</small>
-                    <strong id="modal-emp-id" style="font-size: 14px;">-</strong>
-                </div>
-                <div class="modal-detail-item" style="margin: 0;">
-                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Role</small>
-                    <strong id="modal-emp-role" style="font-size: 14px;">-</strong>
-                </div>
-                <div class="modal-detail-item" style="margin: 0;">
-                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Branch</small>
-                    <strong id="modal-emp-branch" style="font-size: 14px;">-</strong>
-                </div>
-                <div class="modal-detail-item" style="margin: 0;">
-                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Pairs</small>
-                    <strong id="modal-emp-pairs" style="font-size: 14px;">-</strong>
-                </div>
-                <div class="modal-detail-item" style="grid-column: span 2; margin: 0;">
-                    <small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Email</small>
-                    <strong id="modal-emp-email" style="font-size: 14px; word-break: break-all;">-</strong>
-                </div>
+                <div class="modal-detail-item" style="margin: 0;"><small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Full Name</small><strong id="modal-emp-name" style="font-size: 14px;">-</strong></div>
+                <div class="modal-detail-item" style="margin: 0;"><small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Staff ID</small><strong id="modal-emp-id" style="font-size: 14px;">-</strong></div>
+                <div class="modal-detail-item" style="margin: 0;"><small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Role</small><strong id="modal-emp-role" style="font-size: 14px;">-</strong></div>
+                <div class="modal-detail-item" style="margin: 0;"><small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Branch</small><strong id="modal-emp-branch" style="font-size: 14px;">-</strong></div>
+                <div class="modal-detail-item" style="margin: 0;"><small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Pairs</small><strong id="modal-emp-pairs" style="font-size: 14px;">-</strong></div>
+                <div class="modal-detail-item" style="grid-column: span 2; margin: 0;"><small style="display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Email</small><strong id="modal-emp-email" style="font-size: 14px; word-break: break-all;">-</strong></div>
             </div>
-            
-            <!-- Styled Logout Button matching screenshot -->
             <div style="padding: 0 24px 24px;">
                 <button id="btn-logout-drawer" class="drawer-logout-btn" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 10px; background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg> Sign Out
+                    Sign Out
                 </button>
             </div>
         </div>
