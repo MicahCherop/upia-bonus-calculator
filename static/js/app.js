@@ -21,7 +21,6 @@
         });
     }
 
-    // Helper function to decode the Google JWT and extract the profile picture
     const decodeJwt = (token) => {
         try {
             const base64Url = token.split('.')[1];
@@ -51,7 +50,6 @@
             const data = await res.json();
 
             if (data.success) {
-                // Extract picture from Google Token
                 const googlePayload = decodeJwt(response.credential);
                 const finalUser = data.user;
                 if (googlePayload.picture) {
@@ -403,13 +401,51 @@
         };
 
         const renderDashboardData = (data, salary) => {
+            // 1. Update the top Status Badge
             const eligContainer = document.getElementById('eligibility-container');
             if (eligContainer) {
-                if (data.eligibility.full_bonus) eligContainer.innerHTML = `<div class="single-badge full"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Full Bonus Qualified</div>`;
-                else if (data.eligibility.collection_bonus_45) eligContainer.innerHTML = `<div class="single-badge partial"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 45% Collection Bonus Qualified</div>`;
-                else eligContainer.innerHTML = `<div class="single-badge missed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Bonus Missed</div>`;
+                if (data.eligibility.date_disqualified) {
+                    eligContainer.innerHTML = `<div class="single-badge missed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Bonus Missed</div>`;
+                } 
+                else if (data.eligibility.full_bonus) {
+                    eligContainer.innerHTML = `<div class="single-badge full"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Full Bonus Qualified</div>`;
+                } 
+                else if (data.eligibility.collection_bonus_45) {
+                    eligContainer.innerHTML = `<div class="single-badge partial"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> 45% Collection Bonus Qualified</div>`;
+                } 
+                else {
+                    eligContainer.innerHTML = `<div class="single-badge missed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Bonus Missed</div>`;
+                }
             }
 
+            // 2. Inject the highly visible warning into the Payout Card
+            const totalPayoutEl = document.getElementById('res-total-payout');
+            if (totalPayoutEl) {
+                let warningEl = document.getElementById('payout-date-warning');
+                
+                // Create the warning element if it doesn't exist yet
+                if (!warningEl) {
+                    warningEl = document.createElement('div');
+                    warningEl.id = 'payout-date-warning';
+                    // Insert it right above the Total Payout text
+                    totalPayoutEl.parentNode.insertBefore(warningEl, totalPayoutEl);
+                }
+                
+                if (data.eligibility.date_disqualified) {
+                    warningEl.innerHTML = `
+                        <div style="background-color: #fef2f2; color: #b91c1c; border: 1px solid #fca5a5; padding: 10px 12px; border-radius: 8px; margin-bottom: 20px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; text-align: left; font-weight: 500;">
+                            <svg style="width: 16px; height: 16px; min-width: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <div>You had not reported during this cycle</div>
+                        </div>
+                    `;
+                    warningEl.style.display = 'block';
+                } else {
+                    // Hide the warning if they arrived on time
+                    warningEl.style.display = 'none';
+                }
+            }
+
+            // 3. Render all the standard numerical values
             setElText('res-total-payout', formatKES(salary + data.current.base_bonus + data.collection.upside));
             setElText('res-basic-salary', formatKES(salary));
             setElText('res-bonus-earned', formatKES(data.current.base_bonus));
@@ -419,7 +455,7 @@
             setElText('res-current-band-full', `${currentRange} (${data.current.band})`);
             
             if (data.eligibility.collection_bonus_45) {
-                setElText('res-multiplier', `${(data.current.multiplier * 100).toFixed(0)}%`);
+                setElText('res-multiplier', `${(data.current.multiplier * 100).toFixed(2)}%`);
             } else {
                 setElText('res-multiplier', `${data.current.multiplier.toFixed(2)}x`);
             }
@@ -457,7 +493,7 @@
                 const diff = currentMetrics[key] - TARGETS[key];
                 const diffEl = document.getElementById(diffId);
                 if (diffEl) {
-                    diffEl.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
+                    diffEl.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
                     diffEl.className = `diff-val ${diff >= 0 ? 'positive' : 'negative'}`;
                 }
                 const statusEl = document.getElementById(statusId);
@@ -484,19 +520,31 @@
                 setElText('fig-ac-target', p.ac_target || 0);
                 setElText('fig-nc-actual', p.nc_actual || 0);
                 setElText('fig-nc-target', p.nc_target || 0);
-                setElText('fig-otc-val', `${(p.overall_otc || 0).toFixed(1)}%`);
-                setElText('fig-dd7-val', `${(p.dd7_rate || 0).toFixed(1)}%`);
-                setElText('fig-new-otc-val', `${currentMetrics.new_customer_otc.toFixed(1)}%`);
+                setElText('fig-otc-val', `${(parseFloat(p.overall_otc) || 0).toFixed(2)}%`);
+                setElText('fig-dd7-val', `${(parseFloat(p.dd7_rate) || 0).toFixed(2)}%`);
+                setElText('fig-new-otc-val', `${currentMetrics.new_customer_otc.toFixed(2)}%`);
             } else {
                 ['fig-disb-actual','fig-disb-target','fig-ac-actual','fig-ac-target','fig-nc-actual','fig-nc-target'].forEach(id => setElText(id, id.includes('disb') ? 'KSh 0' : '0'));
-                ['fig-otc-val','fig-dd7-val','fig-new-otc-val'].forEach(id => setElText(id, '0.0%'));
+                ['fig-otc-val','fig-dd7-val','fig-new-otc-val'].forEach(id => setElText(id, '0.00%'));
+            }
+
+            let fixedSalary = 29108; 
+            const roleUpper = (viewedUser.type || '').toUpperCase();
+            const pairsStr = String(viewedUser.pairs || '');
+
+            if (roleUpper.includes('BM') || roleUpper.includes('MANAGER')) {
+                if (pairsStr.includes('3')) fixedSalary = 77000;
+                else if (pairsStr.includes('2')) fixedSalary = 67507;
+                else fixedSalary = 45397; 
             }
 
             const payload = {
                 employee_name: viewedUser.name, employee_id: viewedUser.id, employee_type: viewedUser.type, pairs: viewedUser.pairs,
-                salary: getVal('salary'), customers: parseInt(document.getElementById('customers')?.value) || 0, disb_actual: disbActualVal,
+                salary: fixedSalary, customers: parseInt(document.getElementById('customers')?.value) || 0, disb_actual: disbActualVal,
                 disbursement: currentMetrics.disbursement / 100, active_customers: currentMetrics.active_customers / 100,
-                new_customers: currentMetrics.new_customers / 100, otc: currentMetrics.otc / 100, dd7: currentMetrics.dd7 / 100, new_customer_otc: currentMetrics.new_customer_otc / 100
+                new_customers: currentMetrics.new_customers / 100, otc: currentMetrics.otc / 100, dd7: currentMetrics.dd7 / 100, new_customer_otc: currentMetrics.new_customer_otc / 100,
+                date_reported: viewedUser.date_reported || "",
+                month: selectedMonth
             };
 
             try {
@@ -512,8 +560,8 @@
             const p = viewedUser.performance[selectedMonth];
 
             if (p) {
-                const getRate = (a, t, rate) => (t > 0 && !isNaN(a) && !isNaN(t)) ? ((a / t) * 100).toFixed(1) : (rate ? (parseFloat(String(rate).replace('%','')) <= 1 ? (parseFloat(rate)*100).toFixed(1) : parseFloat(rate).toFixed(1)) : "0.0");
-                const parseRate = (v) => (!v) ? "0.0" : (parseFloat(String(v).replace('%','')) <= 1 ? (parseFloat(v)*100).toFixed(1) : parseFloat(v).toFixed(1));
+                const getRate = (a, t, rate) => (t > 0 && !isNaN(a) && !isNaN(t)) ? ((a / t) * 100).toFixed(2) : (rate ? (parseFloat(String(rate).replace('%','')) <= 1 ? (parseFloat(rate)*100).toFixed(2) : parseFloat(rate).toFixed(2)) : "0.00");
+                const parseRate = (v) => (!v) ? "0.00" : (parseFloat(String(v).replace('%','')) <= 1 ? (parseFloat(v)*100).toFixed(2) : parseFloat(v).toFixed(2));
 
                 document.getElementById('disbursement').value = getRate(p.disb_actual, p.disb_target, p.disb_rate);
                 document.getElementById('active_customers').value = getRate(p.ac_actual, p.ac_target, p.ac_rate);
@@ -525,6 +573,7 @@
             } else {
                 ['disbursement','active_customers','new_customers','otc','dd7','new_customer_otc','customers'].forEach(id => { if (document.getElementById(id)) document.getElementById(id).value = 0; });
             }
+            
             runCalculation();
         };
 
@@ -576,7 +625,6 @@
             setElText('modal-emp-pairs', user.pairs);
             setElText('modal-emp-email', user.email || '-');
 
-            // Inject the user's Profile Picture into the top right navigation
             const avatarContainer = document.getElementById('top-user-avatar');
             if (avatarContainer && user.picture) {
                 avatarContainer.innerHTML = `<img src="${user.picture}" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
@@ -585,7 +633,6 @@
                 avatarContainer.style.padding = '0';
             }
 
-            // Inject the user's Profile Picture into the Centralized Modal
             const modalAvatarWrap = document.getElementById('modal-user-avatar-wrap');
             if (modalAvatarWrap && user.picture) {
                 modalAvatarWrap.innerHTML = `<img src="${user.picture}" alt="Profile" style="width: 100%; height: 100%; object-fit: cover;">`;
@@ -605,11 +652,28 @@
             setElText('emp-info-name', user.name);
             setElText('emp-info-id', user.id);
             setElText('emp-info-role', user.type);
+            setElText('emp-info-branch', user.branch);
+            // ------------------------------------------
+            
             setElText('emp-info-pairs', user.pairs);
             
-            if (document.getElementById('salary')) document.getElementById('salary').value = '';
+            let fixedSalary = 29108; 
+            const roleUpper = (user.type || '').toUpperCase();
+            const pairsStr = String(user.pairs || '');
+
+            if (roleUpper.includes('BM') || roleUpper.includes('MANAGER')) {
+                if (pairsStr.includes('3')) fixedSalary = 77000;
+                else if (pairsStr.includes('2')) fixedSalary = 67507;
+                else fixedSalary = 45397; 
+            }
+
+            const salaryEl = document.getElementById('emp-info-salary');
+            if (salaryEl) {
+                salaryEl.textContent = formatKES(fixedSalary);
+            }
+
             setupMonthFilter();
-            applyMonthPerformance();
+            applyMonthPerformance(); 
         };
 
         const computePerformanceForUser = (user, perfData) => {
@@ -620,30 +684,11 @@
             user.performance = {};
 
             if (isBM) {
-                const prefix = `${branch}_`;
-                const agg = {};
                 for (const [key, metrics] of Object.entries(perfData || {})) {
-                    if (key.toLowerCase().startsWith(prefix)) {
-                        const parts = key.split('_');
-                        const monthCode = parts[parts.length - 1];
-                        if (!agg[monthCode]) agg[monthCode] = { count: 0, disb_actual: 0, disb_target: 0, disb_rate: 0, ac_actual: 0, ac_target: 0, ac_rate: 0, nc_actual: 0, nc_target: 0, nc_rate: 0, overall_otc: 0, dd7_rate: 0, new_customer_otc: 0 };
-                        
-                        const m = agg[monthCode];
-                        m.count++;
-                        m.disb_actual += metrics.disb_actual || 0; m.disb_target += metrics.disb_target || 0; m.disb_rate += metrics.disb_rate || 0;
-                        m.ac_actual += metrics.ac_actual || 0; m.ac_target += metrics.ac_target || 0; m.ac_rate += metrics.ac_rate || 0;
-                        m.nc_actual += metrics.nc_actual || 0; m.nc_target += metrics.nc_target || 0; m.nc_rate += metrics.nc_rate || 0;
-                        m.overall_otc += metrics.overall_otc || 0; m.dd7_rate += metrics.dd7_rate || 0; m.new_customer_otc += metrics.new_customer_otc || 0;
-                    }
-                }
-                for (const [mCode, data] of Object.entries(agg)) {
-                    if (data.count > 0) {
-                        user.performance[mCode] = {
-                            disb_actual: data.disb_actual, disb_target: data.disb_target, disb_rate: data.disb_rate / data.count,
-                            ac_actual: data.ac_actual, ac_target: data.ac_target, ac_rate: data.ac_rate / data.count,
-                            nc_actual: data.nc_actual, nc_target: data.nc_target, nc_rate: data.nc_rate / data.count,
-                            overall_otc: data.overall_otc / data.count, dd7_rate: data.dd7_rate / data.count, new_customer_otc: data.new_customer_otc / data.count
-                        };
+                    const parts = key.split('_');
+                    if (parts.length === 2 && parts[0] === branch) {
+                        const monthCode = parts[1];
+                        user.performance[monthCode] = metrics;
                     }
                 }
             } else {
@@ -755,11 +800,8 @@
             renderOpsStaffTable();
         });
 
-        document.getElementById('btn-calculate')?.addEventListener('click', (e) => { e.preventDefault(); runCalculation(); });
-        document.getElementById('salary')?.addEventListener('input', runCalculation);
         document.getElementById('calculator-form')?.addEventListener('submit', (e) => { e.preventDefault(); runCalculation(); });
 
-        // --- Safe User Initialization ---
         if (!cachedUserStr) {
             window.location.href = '/';
         } else {
@@ -836,7 +878,6 @@ function renderGoogleButton() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     container.innerHTML = '';
     
-    // Adjusted styling and shape to match the personalized rectangular button
     google.accounts.id.renderButton(container, { 
         type: "standard", 
         shape: "rectangular", 
@@ -846,16 +887,12 @@ function renderGoogleButton() {
         logo_alignment: "left" 
     });
     
-    // Automatically trigger One Tap if a session exists
     google.accounts.id.prompt();
 }
 
 window.addEventListener('load', () => setTimeout(renderGoogleButton, 300));
 document.getElementById('theme-toggle-btn')?.addEventListener('click', () => setTimeout(renderGoogleButton, 50));
 
-// =========================================================
-// PWA SERVICE WORKER & INSTALLATION LOGIC
-// =========================================================
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -867,38 +904,26 @@ if ('serviceWorker' in navigator) {
 let deferredPrompt;
 const installBtn = document.getElementById('pwa-install-btn');
 
-// Capture the install prompt from the browser
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing automatically on mobile
     e.preventDefault();
-    // Stash the event so it can be triggered later.
     deferredPrompt = e;
-    
-    // Show our custom FAB button
     if (installBtn) {
         installBtn.style.display = 'flex';
     }
 });
 
-// Trigger the installation when the FAB is clicked
 if (installBtn) {
     installBtn.addEventListener('click', async () => {
         if (deferredPrompt) {
-            // Show the native browser install prompt
             deferredPrompt.prompt();
-            // Wait for the user to respond
             const { outcome } = await deferredPrompt.userChoice;
             console.log(`User install outcome: ${outcome}`);
-            
-            // We've used the prompt, throw it away
             deferredPrompt = null;
-            // Hide the button since they've interacted with it
             installBtn.style.display = 'none';
         }
     });
 }
 
-// Listen for successful installation to hide the button permanently
 window.addEventListener('appinstalled', () => {
     if (installBtn) {
         installBtn.style.display = 'none';

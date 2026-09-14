@@ -127,63 +127,20 @@ def auth_google():
                     user_info['type'] = "System Admin"
                     emp_type = "ADMIN"
 
-                # 2. Skip Performance Calculation for Ops/Admins
+                # 2. Fetch User Performance Data
                 if not user_info.get('is_ops'):
                     is_bm = "BM" in emp_type or "MANAGER" in emp_type
                     
                     if is_bm:
-                        branch_prefix = f"{user_branch}_"
-                        agg_data = {}
-                        
-                        for key, metrics in performance_data.items():
-                            if key.startswith(branch_prefix):
-                                parts = key.split('_')
-                                if len(parts) >= 3:
-                                    month_code = parts[-1]
-                                    
-                                    if month_code not in agg_data:
-                                        agg_data[month_code] = {
-                                            "count": 0,
-                                            "disb_target": 0.0, "disb_actual": 0.0, "disb_rate": 0.0,
-                                            "ac_target": 0.0, "ac_actual": 0.0, "ac_rate": 0.0,
-                                            "nc_target": 0.0, "nc_actual": 0.0, "nc_rate": 0.0,
-                                            "overall_otc": 0.0, "dd7_rate": 0.0, "new_customer_otc": 0.0
-                                        }
-                                    
-                                    m = agg_data[month_code]
-                                    m["count"] += 1
-                                    
-                                    m["disb_target"] += metrics.get("disb_target", 0)
-                                    m["disb_actual"] += metrics.get("disb_actual", 0)
-                                    m["disb_rate"] += metrics.get("disb_rate", 0)
-                                    m["ac_target"] += metrics.get("ac_target", 0)
-                                    m["ac_actual"] += metrics.get("ac_actual", 0)
-                                    m["ac_rate"] += metrics.get("ac_rate", 0)
-                                    m["nc_target"] += metrics.get("nc_target", 0)
-                                    m["nc_actual"] += metrics.get("nc_actual", 0)
-                                    m["nc_rate"] += metrics.get("nc_rate", 0)
-                                    m["overall_otc"] += metrics.get("overall_otc", 0)
-                                    m["dd7_rate"] += metrics.get("dd7_rate", 0)
-                                    m["new_customer_otc"] += metrics.get("new_customer_otc", 0)
-                        
-                        for month_code, agg in agg_data.items():
-                            c = agg["count"]
-                            if c > 0:
-                                user_info['performance'][month_code] = {
-                                    "disb_target": agg["disb_target"],
-                                    "disb_actual": agg["disb_actual"],
-                                    "disb_rate": agg["disb_rate"] / c,
-                                    "ac_target": agg["ac_target"],
-                                    "ac_actual": agg["ac_actual"],
-                                    "ac_rate": agg["ac_rate"] / c,
-                                    "nc_target": agg["nc_target"],
-                                    "nc_actual": agg["nc_actual"],
-                                    "nc_rate": agg["nc_rate"] / c,
-                                    "overall_otc": agg["overall_otc"] / c,
-                                    "dd7_rate": agg["dd7_rate"] / c,
-                                    "new_customer_otc": agg["new_customer_otc"] / c
-                                }
+                        # Fetch BM specific performance data directly without averaging
+                        bm_performance_data = bonus_config.get('bm_performance', {})
+                        for key, metrics in bm_performance_data.items():
+                            parts = key.split('_')
+                            if len(parts) == 2 and parts[0] == user_branch:
+                                month_code = parts[1]
+                                user_info['performance'][month_code] = metrics
                     else:
+                        # Fetch standard LOCO performance data
                         user_pair_raw = str(user_info.get('pairs', '1')).strip().lower()
                         if user_pair_raw in ['1', '']: user_pair_raw = 'pair 1'
                         elif user_pair_raw == '2': user_pair_raw = 'pair 2'
@@ -206,7 +163,10 @@ def auth_google():
                 if user_info.get('is_ops'):
                     sorted_staff = sorted(staff_data.values(), key=lambda x: x.get('name', ''))
                     response_payload['all_staff'] = sorted_staff
-                    response_payload['raw_performance'] = performance_data 
+                    
+                    # Merge both performance sheets so Ops can impersonate ANY role seamlessly
+                    merged_perf = {**bonus_config.get("performance", {}), **bonus_config.get("bm_performance", {})}
+                    response_payload['raw_performance'] = merged_perf 
 
                 return jsonify(response_payload)
                 
@@ -274,6 +234,7 @@ def reload_config():
         return jsonify({"success": True, "message": "Configuration reloaded and Redis Cache updated successfully."})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/admin')
 def admin_dashboard():
     # In a fully session-backed app, you would verify an admin token here.
@@ -282,4 +243,3 @@ def admin_dashboard():
 
 if __name__ == '__main__':
     app.run(debug=True)
-    

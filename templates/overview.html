@@ -107,15 +107,16 @@
                         <div class="slim-info-section">
                             <div class="slim-info-item"><small>Employee Name</small><strong id="emp-info-name">-</strong></div>
                             <div class="slim-info-item"><small>Staff ID</small><strong id="emp-info-id">-</strong></div>
+                            <div class="slim-info-item">
+                                <small>BRANCH</small>
+                                <strong id="emp-info-branch" style="font-size: 16px; color: var(--text-color);">-</strong>
+                            </div>                            
                             <div class="slim-info-item"><small>Role</small><strong id="emp-info-role">-</strong></div>
                             <div class="slim-info-item"><small>Pairs</small><strong id="emp-info-pairs">-</strong></div>
                             <div class="slim-info-item">
-                                <small>Base Salary (KES)</small>
-                                <div class="salary-action-wrap">
-                                    <input type="number" id="salary" value="" placeholder="Enter Salary..." class="table-input salary-input">
-                                    <button type="button" id="btn-calculate" class="btn-primary btn-calc-top">Calculate</button>
-                                </div>
-                            </div>
+                                <small>Base Salary</small>
+                                <strong id="emp-info-salary" style="font-size: 16px; color: var(--text-color);">KSh 0</strong>
+                            </div>                            
                         </div>
                         <div class="slim-eligibility-section">
                             <small>ELIGIBILITY STATUS</small>
@@ -173,22 +174,22 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr class="metric-row" data-metric="disbursement"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">Disbursement Rate</span><span class="name-abbr">Disb. Rate</span></td><td>98.0%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="disbursement" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-disbursement" class="diff-val">+0.0%</td><td id="status-disbursement"><span class="status-badge met">✓ Met</span></td></tr>
+                                            <tr class="metric-row" data-metric="disbursement"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">Disbursement Rate</span><span class="name-abbr">Disb. Rate</span></td><td>98.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="disbursement" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-disbursement" class="diff-val">+0.0%</td><td id="status-disbursement"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-disbursement"><td colspan="5"><div class="metric-details-box"><span>Actual Disbursed: <strong id="fig-disb-actual">KSh 0</strong></span><span>Target: <strong id="fig-disb-target">KSh 0</strong></span></div></td></tr>
 
-                                            <tr class="metric-row" data-metric="active_customers"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">Active Customers %</span><span class="name-abbr">Active Cust. %</span></td><td>95.0%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="active_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-active-customers" class="diff-val">+0.0%</td><td id="status-active-customers"><span class="status-badge met">✓ Met</span></td></tr>
+                                            <tr class="metric-row" data-metric="active_customers"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">Active Customers %</span><span class="name-abbr">Active Cust. %</span></td><td>95.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="active_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-active-customers" class="diff-val">+0.0%</td><td id="status-active-customers"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-active_customers"><td colspan="5"><div class="metric-details-box"><span>Active Customers: <strong id="fig-ac-actual">0</strong></span><span>Target: <strong id="fig-ac-target">0</strong></span></div></td></tr>
 
-                                            <tr class="metric-row" data-metric="new_customers"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">New Customers %</span><span class="name-abbr">New Cust. %</span></td><td>95.0%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="new_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-new-customers" class="diff-val">0.0%</td><td id="status-new-customers"><span class="status-badge met">✓ Met</span></td></tr>
+                                            <tr class="metric-row" data-metric="new_customers"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">New Customers %</span><span class="name-abbr">New Cust. %</span></td><td>95.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="new_customers" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-new-customers" class="diff-val">0.0%</td><td id="status-new-customers"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-new_customers"><td colspan="5"><div class="metric-details-box"><span>New Customers: <strong id="fig-nc-actual">0</strong></span><span>Target: <strong id="fig-nc-target">0</strong></span></div></td></tr>
 
-                                            <tr class="metric-row" data-metric="otc"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">OTC Rate</span><span class="name-abbr">OTC Rate</span></td><td>91.5%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="otc" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-otc" class="diff-val">+0.0%</td><td id="status-otc"><span class="status-badge met">✓ Met</span></td></tr>
+                                            <tr class="metric-row" data-metric="otc"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">OTC Rate</span><span class="name-abbr">OTC Rate</span></td><td>91.50%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="otc" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-otc" class="diff-val">+0.0%</td><td id="status-otc"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-otc"><td colspan="5"><div class="metric-details-box"><span>Overall OTC Rate: <strong id="fig-otc-val">0.0%</strong></span></div></td></tr>
 
-                                            <tr class="metric-row" data-metric="dd7"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">DD+7 Rate</span><span class="name-abbr">DD+7 Rate</span></td><td>94.0%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="dd7" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-dd7" class="diff-val">+0.0%</td><td id="status-dd7"><span class="status-badge met">✓ Met</span></td></tr>
+                                            <tr class="metric-row" data-metric="dd7"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">DD+7 Rate</span><span class="name-abbr">DD+7 Rate</span></td><td>94.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="dd7" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-dd7" class="diff-val">+0.0%</td><td id="status-dd7"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-dd7"><td colspan="5"><div class="metric-details-box"><span>DD+7 Rate: <strong id="fig-dd7-val">0.0%</strong></span></div></td></tr>
 
-                                            <tr class="metric-row" data-metric="new_customer_otc"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">New Customer OTC</span><span class="name-abbr">New Cust. OTC</span></td><td>90.0%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="new_customer_otc" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-new-cust-otc" class="diff-val">+0.0%</td><td id="status-new-cust-otc"><span class="status-badge met">✓ Met</span></td></tr>
+                                            <tr class="metric-row" data-metric="new_customer_otc"><td class="metric-name"><span class="expand-icon">›</span> <span class="name-full">New Customer OTC</span><span class="name-abbr">New Cust. OTC</span></td><td>90.00%</td><td><div class="table-input-wrap"><input type="number" step="0.1" id="new_customer_otc" value="0" class="table-input" readonly><span class="input-symbol">%</span></div></td><td id="diff-new-cust-otc" class="diff-val">+0.0%</td><td id="status-new-cust-otc"><span class="status-badge met">✓ Met</span></td></tr>
                                             <tr class="details-row" id="details-new_customer_otc"><td colspan="5"><div class="metric-details-box"><span>New Customer OTC: <strong id="fig-new-otc-val">0.0%</strong></span></div></td></tr>
                                         </tbody>
                                     </table>

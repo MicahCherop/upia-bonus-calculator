@@ -1,9 +1,6 @@
-def calculate_bonus(data, config):
-    try:
-        salary = float(data.get('salary', 0))
-    except (ValueError, TypeError):
-        salary = 0.0
+from datetime import datetime
 
+def calculate_bonus(data, config):
     try:
         customers = int(data.get('customers', 0))
     except (ValueError, TypeError):
@@ -11,6 +8,7 @@ def calculate_bonus(data, config):
 
     emp_type = str(data.get('employee_type', '')).strip().upper()
     pairs_raw = str(data.get('pairs', '')).strip()
+    is_bm = "BM" in emp_type or "BRANCH MANAGER" in emp_type
 
     # Clean pairs string ("1 Pair", "2 Pairs", "3 Pairs" -> "1", "2", "3")
     pairs_clean = "1"
@@ -21,10 +19,21 @@ def calculate_bonus(data, config):
     elif "1" in pairs_raw:
         pairs_clean = "1"
 
+    # --- HARDCODED FIXED SALARIES ---
+    if is_bm:
+        if pairs_clean == "3":
+            salary = 77000.0
+        elif pairs_clean == "2":
+            salary = 67507.0
+        else:
+            salary = 45397.0
+    else:
+        # Standard LOCO Salary
+        salary = 29108.0
+
     # 1. Eligibility Check
     criteria = config.get('criteria', {})
-    
-    # Safely round to prevent float distortion failures (e.g., 0.97999 < 0.98)
+        
     disb_ok = round(float(data.get('disbursement', 0)), 4) >= criteria.get('disbursement', 0.98)
     ac_ok = round(float(data.get('active_customers', 0)), 4) >= criteria.get('active_customers', 0.95)
     nc_ok = round(float(data.get('new_customers', 0)), 4) >= criteria.get('new_customers', 0.95)
@@ -33,16 +42,56 @@ def calculate_bonus(data, config):
     new_otc_ok = round(float(data.get('new_customer_otc', 0)), 4) >= criteria.get('new_customer_otc', 0.90)
 
     full_bonus = disb_ok and ac_ok and nc_ok and otc_ok and dd7_ok and new_otc_ok
-    
-    # FIX: Ensure New Customer OTC is strictly enforced for the Collection Bonus
     collection_bonus_45 = (not full_bonus) and (otc_ok and dd7_ok and new_otc_ok)
+
+    # --- DATE REPORTED LOGIC ---
+    # .split(' ')[0] ensures we drop any accidental timestamps (e.g., "26-6-2026 14:30:00")
+    date_reported_str = str(data.get('date_reported', '')).strip().split(' ')[0]
+    month_code = str(data.get('month', '')).strip() 
+    date_disqualified = False 
+    
+    if date_reported_str and month_code and len(month_code) == 6:
+        from datetime import datetime, date
+        
+        def _parse_date(d_str):
+            formats = [
+                '%d-%m-%Y', '%d/%m/%Y', 
+                '%Y-%m-%d', '%Y/%m/%d',
+                '%d-%b-%Y', '%d %b %Y',
+                '%m-%d-%Y', '%m/%d/%Y'
+            ]
+            for fmt in formats:
+                try:
+                    # Return a strict Date object (no time attached)
+                    return datetime.strptime(d_str, fmt).date()
+                except ValueError:
+                    continue
+            return None
+            
+        rep_date = _parse_date(date_reported_str)
+        if rep_date:
+            try:
+                perf_year = int(month_code[:4])
+                perf_month = int(month_code[4:6])
+                
+                # Create a strict cutoff date: The 5th day of the performance month
+                cutoff_date = date(perf_year, perf_month, 5)
+                
+                # Rule: If they reported AFTER the 5th of the performance month, disqualify them
+                if rep_date > cutoff_date:
+                    full_bonus = False
+                    collection_bonus_45 = False
+                    date_disqualified = True
+                    
+            except Exception as e:
+                pass
+    # --------------------------------
 
     eligibility = {
         "full_bonus": full_bonus,
-        "collection_bonus_45": collection_bonus_45
+        "collection_bonus_45": collection_bonus_45,
+        "date_disqualified": date_disqualified 
     }
-
-    is_bm = "BM" in emp_type or "BRANCH MANAGER" in emp_type
 
     # 2. Select Band Table based on Role & Pairs
     if is_bm:
@@ -56,7 +105,6 @@ def calculate_bonus(data, config):
     active_multiplier = 0.0
     next_band_info = None
     
-    # Initialize bounds for the UI
     current_min = 0
     current_max = 0
 
@@ -65,14 +113,11 @@ def calculate_bonus(data, config):
             if customers <= band.get('max', float('inf')):
                 current_band = band['name']
                 
-                # Dynamically set display boundaries for UI
                 current_max = band.get('max', float('inf'))
                 current_min = 0 if idx == 0 else bands[idx - 1].get('max', 0) + 1
 
-                # Fetch Multipliers 
                 full_mult = band.get('full_mult', band.get('multiplier', 0.0))
                 
-                # FIX: Set exact 45% Collection logic mapping for Loan/Collection Officers
                 if is_bm:
                     partial_mult = band.get('partial_mult', full_mult * 0.45)
                 else:
@@ -85,9 +130,8 @@ def calculate_bonus(data, config):
                     else:
                         partial_mult = 0.50
 
-                display_multiplier = full_mult # Shows the maximum potential of the band on the UI
+                display_multiplier = full_mult
 
-                # Select applied multiplier based on eligibility
                 if full_bonus:
                     active_multiplier = full_mult
                 elif collection_bonus_45:
@@ -95,7 +139,6 @@ def calculate_bonus(data, config):
                 else:
                     active_multiplier = 0.0
 
-                # Next Band Opportunity
                 if idx + 1 < len(bands):
                     next_b = bands[idx + 1]
                     
@@ -107,7 +150,6 @@ def calculate_bonus(data, config):
 
                     next_full_mult = next_b.get('full_mult', next_b.get('multiplier', 0.0))
                     
-                    # FIX: Predict Next Band Partial Multipliers properly for LO/COs
                     if is_bm:
                         next_partial_mult = next_b.get('partial_mult', next_full_mult * 0.45)
                     else:
@@ -151,12 +193,14 @@ def calculate_bonus(data, config):
                     }
                 break
 
-    # 3. Compute Base Bonus Payout using the Active Multiplier
+    # 3. Compute Base Bonus Payout
     base_bonus = salary * active_multiplier
 
     # 4. Compute Founder's Collection Upside Bonus (Using DD+7)
     collection_upside = 0.0
-    if full_bonus or collection_bonus_45:
+    
+    # Only compute if they didn't miss the 5th-of-the-month arrival rule
+    if not date_disqualified:
         dd7_val = float(data.get('dd7', 0))
         disb_actual = float(data.get('disb_actual', 0))
 
@@ -179,6 +223,7 @@ def calculate_bonus(data, config):
             best_payout = 0.0
             for thresh_str, amt in target_row.get('payouts', {}).items():
                 thresh = float(thresh_str)
+                # Evaluate directly on the DD+7 rate
                 if dd7_val >= (thresh - 0.0001):
                     if amt > best_payout:
                         best_payout = amt
@@ -199,9 +244,11 @@ def calculate_bonus(data, config):
             "upside": collection_upside
         }
     }
-def evaluate_criteria(data, criteria_targets):
+def evaluate_criteria(data, criteria_targets, emp_type=""):
     results = []
+    
     for key, target in criteria_targets.items():
+        # New Customer OTC is now visible and evaluated for everyone
         actual = float(data.get(key, 0))
         passed = actual >= target
         results.append({
@@ -218,7 +265,7 @@ def get_band(customers, bands):
     for b in bands:
         if customers <= b['max']:
             return b
-    return bands[-1] # Fallback to highest
+    return bands[-1] 
 
 def get_next_band(customers, bands):
     for i, b in enumerate(bands):
@@ -226,14 +273,11 @@ def get_next_band(customers, bands):
             if i + 1 < len(bands) and bands[i+1]['max'] != float('inf'):
                 return {"name": bands[i+1]['name'], "threshold": b['max'] + 1}
             elif i + 1 < len(bands) and bands[i+1]['max'] == float('inf'):
-                # Handle Elite bounds
                 return {"name": bands[i+1]['name'], "threshold": b['max'] + 1}
             return None
     return None
 
 def calculate_base(salary, multiplier, full_bonus, col_bonus_passed):
-    # As isolated based on prompt rule: if neither qualify, base is 0. 
-    # If only 45% qualifies, base is scaled. (Customizable isolate formula)
     if full_bonus:
         return salary * multiplier
     elif col_bonus_passed:
