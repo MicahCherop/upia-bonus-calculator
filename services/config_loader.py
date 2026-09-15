@@ -24,19 +24,11 @@ def load_configuration(sheet_id):
             "bm_bands": _parse_bm_bands(),
             "collection_upside": _parse_collections(fetch_csv_rows(sheet_id, 'Collections upside')),
             "staff": _parse_staff_list(fetch_csv_rows(sheet_id, 'Staff_List')),
-            
-            # FETCH LOCO FROM 'LOCO Performance' SHEET
             "performance": _parse_performance(fetch_csv_rows(sheet_id, 'LOCO Performance')),
-            
-            # FETCH BM FROM 'BM Performance' SHEET
             "bm_performance": _parse_bm_performance(fetch_csv_rows(sheet_id, 'BM Performance')), 
-            
             "management": {}  
         }
         
-        # ---------------------------------------------------------
-        # Fetch the Management Sheet
-        # ---------------------------------------------------------
         try:
             management_rows = fetch_csv_rows(sheet_id, 'Management')
             for row in management_rows[1:]:
@@ -159,28 +151,38 @@ def _get_fallback_config():
         "collection_upside": {"loco_1pair": [], "bm_2_3pair": []},
         "staff": {}, 
         "performance": {},
-        "bm_performance": {} # Added fallback for BM data
+        "bm_performance": {} 
     }
+    
 def _parse_staff_list(rows):
     employees = {}
     if not rows or len(rows) < 2:
         return employees
+        
     for row in rows[1:]:
         try:
-            if len(row) > 2:
-                email = str(row[2]).strip().lower()
-                if email and email != 'nan' and '@' in email:
-                    employees[email] = {
-                        "branch": str(row[0]).strip() if len(row) > 0 else "",
-                        "name": str(row[1]).strip() if len(row) > 1 else "",
-                        "email": email,
-                        "pairs": str(row[3]).strip() if len(row) > 3 else "1",
-                        "type": str(row[4]).strip() if len(row) > 4 else "",
-                        "id": str(row[5]).strip() if len(row) > 5 else "N/A",
-                        # Capture Date Reported from Column G
-                        "date_reported": str(row[6]).strip() if len(row) > 6 else ""
-                    }
-        except Exception:
+            # STRICTLY PAD ROW TO PREVENT ERRORS
+            while len(row) < 12:
+                row.append("")
+                
+            email = str(row[2]).strip().lower() # Column C
+            if email and email != 'nan' and '@' in email:
+                employees[email] = {
+                    "branch": str(row[0]).strip(),           # Column A (Current Branch)
+                    "name": str(row[1]).strip(),             # Column B 
+                    "email": email,                          # Column C
+                    "pairs": str(row[3]).strip() or "1",     # Column D
+                    "type": str(row[4]).strip(),             # Column E
+                    "id": str(row[5]).strip() or "N/A",      # Column F
+                    "date_reported": str(row[6]).strip(),    # Column G
+                    
+                    # STRICT COLUMN MAPPINGS
+                    "previous_staff": str(row[7]).strip(),   # Column H
+                    "previous_branch": str(row[8]).strip(),  # Column I (Previous Branch)
+                    "previous_role": str(row[9]).strip(),    # Column J
+                    "date_exited": str(row[10]).strip()      # Column K
+                }
+        except Exception as e:
             continue
     return employees
 
@@ -200,7 +202,6 @@ def _parse_performance(rows):
     headers = [str(c).strip().lower() for c in rows[0]]
     data_rows = rows[1:]
 
-    # Forward fill state for first 4 columns (fixes Google Sheets merged cells)
     last_seen = ["", "", "", ""]
 
     for row in data_rows:
@@ -210,7 +211,6 @@ def _parse_performance(rows):
             while len(row) < len(headers):
                 row.append("")
 
-            # Forward fill merged cells
             for col_idx in range(min(4, len(row))):
                 val = str(row[col_idx]).strip()
                 if val and val.lower() not in ['nan', 'null', '']:
@@ -263,7 +263,6 @@ def _parse_performance(rows):
                     "new_customer_otc": get_val(["new customer", "nc otc", "new cust otc"], 21)
                 }
         except Exception as e:
-            print(f"Skipping performance row: {e}")
             continue
 
     return perf_records
@@ -273,10 +272,7 @@ def _parse_bm_performance(rows):
     if not rows or len(rows) < 2:
         return perf_records
 
-    headers = [str(c).strip().lower() for c in rows[0]]
     data_rows = rows[1:]
-
-    # Track last seen values to fix merged cells for Col A (Month) and Col E (Branch)
     last_month = ""
     last_branch = ""
 
@@ -284,18 +280,15 @@ def _parse_bm_performance(rows):
         try:
             if not row: continue
             
-            # Increased to 21 to ensure we can safely read up to Column T (Index 19)
             while len(row) < 21: 
                 row.append("")
 
-            # Forward fill Month (Col A / Index 0)
             val_a = str(row[0]).strip()
             if val_a and val_a.lower() not in ['nan', 'null', '']:
                 last_month = val_a
             else:
                 row[0] = last_month
 
-            # Forward fill Market/Branch (Col E / Index 4)
             val_e = str(row[4]).strip()
             if val_e and val_e.lower() not in ['nan', 'null', '']:
                 last_branch = val_e
@@ -316,7 +309,6 @@ def _parse_bm_performance(rows):
                     except Exception:
                         return 0.0
 
-                # Keyed exclusively by branch and month (no averaging needed)
                 lookup_key = f"{branch}_{month_code}"
                 perf_records[lookup_key] = {
                     "disb_target": _clean_float(row[5]),      # Col F
@@ -330,10 +322,9 @@ def _parse_bm_performance(rows):
                     "nc_rate": _clean_float(row[13]),         # Col N
                     "overall_otc": _clean_float(row[14]),     # Col O
                     "dd7_rate": _clean_float(row[17]),        # Col R
-                    "new_customer_otc": _clean_float(row[19]) # Col T (Index 19)
+                    "new_customer_otc": _clean_float(row[19]) # Col T 
                 }
         except Exception as e:
-            print(f"Skipping BM performance row: {e}")
             continue
 
     return perf_records

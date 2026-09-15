@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | UPIA Bonus Calculator</title>
+    
+    <!-- ALLOWS GOOGLE PROFILE IMAGES TO LOAD -->
+    <meta name="referrer" content="no-referrer">
+    
     <link rel="icon" type="image/jpeg" href="{{ url_for('static', filename='icon.png') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -26,17 +30,35 @@
 <body>
     <div id="app-wrapper">
         <header class="top-navbar">
-            <div class="nav-brand" style="display: flex; align-items: center; gap: 8px;">
-                <img src="{{ url_for('static', filename='icon.png') }}" alt="UPIA Logo" style="width: 24px; height: 24px; border-radius: 6px; object-fit: cover;">
+            <div class="nav-brand">
+                <img src="{{ url_for('static', filename='icon.png') }}" alt="UPIA Logo" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover;">
                 <span class="logo-text">Upia Bonus Calculator</span>
-            </div>
-            <div class="nav-user-profile">
-                <div class="avatar-circle" id="top-user-avatar" title="View Profile Details">
-                    <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                </div>
-                <div class="user-meta">
-                    <span class="user-name" id="top-user-name">Loading...</span>
-                    <span class="user-role" id="top-user-role">...</span>
+            </div> 
+            
+            <!-- Right Side Actions (Dark Mode Toggle & Profile) -->
+            <div class="top-nav-actions">
+                <button id="theme-toggle-btn" class="header-theme-btn" title="Toggle Dark Mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                
+                <div class="nav-user-profile">
+                    <div class="avatar-circle" id="top-user-avatar" title="View Profile Details">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <div class="user-meta">
+                        <span class="user-name" id="top-user-name">Loading...</span>
+                        <span class="user-role" id="top-user-role">...</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -61,7 +83,13 @@
                 <div class="sidebar-footer-card">
                     <div class="status-indicator"><span class="status-dot green"></span><span class="status-title">Configuration</span></div>
                     <p class="status-sub">System Loaded</p>
-                    <small id="last-updated-text" style="color: var(--text-muted)">Live tracking active</small>
+                    <small id="last-updated-text" style="color: var(--text-muted); margin-bottom: 8px; display: block;">Live tracking active</small>
+                    
+                    <!-- NEW SYNC BUTTON -->
+                    <button id="btn-force-sync" style="width: 100%; padding: 6px; font-size: 11px; background: rgba(59, 130, 246, 0.1); color: var(--primary-blue); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 4px; cursor: pointer; font-weight: 600; display: flex; justify-content: center; align-items: center; gap: 6px; transition: all 0.2s;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                        Sync Latest Changes
+                    </button>
                 </div>
             </aside>
 
@@ -274,9 +302,17 @@
         </div>
     </div>
 
-    <button id="theme-toggle-btn" class="floating-theme-btn" aria-label="Toggle Theme"></button>
-    <button id="pwa-install-btn" class="fab-install-btn" aria-label="Install App" style="display: none;">Install App</button>
+    <!-- FLOATING PWA INSTALL BUTTON -->
+    <button id="install-app-btn" class="btn-primary install-app-btn" title="Install App">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span class="btn-label">Install App</span>
+    </button>
 
+    <!-- PROFILE MODAL -->
     <div id="mobile-profile-modal" class="profile-modal-overlay">
         <div class="profile-modal-card" style="max-width: 360px; padding: 0;">
             <div class="profile-modal-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px; margin-bottom: 0;">
@@ -302,8 +338,8 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script id="staff-data-json" type="application/json">{{ employees_json | safe }}</script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=2.0"></script>
 </body>
 </html>

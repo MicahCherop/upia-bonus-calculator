@@ -5,21 +5,10 @@
 
     const TARGETS = { disbursement: 98.0, active_customers: 95.0, new_customers: 95.0, otc: 91.5, dd7: 94.0, new_customer_otc: 90.0 };
 
-    const themeBtn = document.getElementById('theme-toggle-btn');
-    if (themeBtn) {
-        const sunSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
-        const moonSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
-
-        const initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
-        themeBtn.innerHTML = initialTheme === 'light' ? moonSVG : sunSVG;
-
-        themeBtn.addEventListener('click', function() {
-            const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            themeBtn.innerHTML = newTheme === 'light' ? moonSVG : sunSVG;
-        });
-    }
+    const toTitleCase = (str) => {
+        if (!str) return "";
+        return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+    };
 
     const decodeJwt = (token) => {
         try {
@@ -105,7 +94,6 @@
             if (!targetView) return;
             const activePanel = document.getElementById(`view-${targetView}`);
             
-            // Safety check: If the panel doesn't exist on this HTML page, stop here!
             if (!activePanel) return; 
 
             document.querySelectorAll('.view-panel').forEach(panel => panel.style.display = 'none');
@@ -124,6 +112,106 @@
                 } else {
                     mainWorkspace.classList.remove('full-width');
                     mainWorkspace.style.maxWidth = '1100px';
+                }
+            }
+        };
+
+        const getTransferMonthCode = (dateStr) => {
+            if (!dateStr) return "100000"; 
+            let str = String(dateStr).trim();
+
+            const parts = str.split(/[-/]/);
+            if (parts.length >= 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parseInt(parts[2], 10);
+                
+                if (year > 2000 && month >= 1 && month <= 12) {
+                    return `${year}${String(month).padStart(2, '0')}`;
+                } else if (day > 2000 && month >= 1 && month <= 12) {
+                    return `${day}${String(month).padStart(2, '0')}`;
+                }
+            }
+
+            if (/^[a-zA-Z]+$/.test(str)) str += ` ${new Date().getFullYear()}`;
+            const d = new Date(str);
+            if (isNaN(d)) return "100000";
+            return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+        };
+
+        const getActiveProfile = (user, monthCode) => {
+            const transferDate = user.date_exited || user.date_reported; 
+            const transferMonthCode = getTransferMonthCode(transferDate);
+
+            const hasPreviousBranch = user.previous_branch && String(user.previous_branch).trim() !== "";
+
+            if (hasPreviousBranch && monthCode <= transferMonthCode) {
+                return {
+                    branch: toTitleCase(String(user.previous_branch).trim()), 
+                    type: (user.previous_role || user.type).trim(), 
+                    pairs: user.pairs, 
+                    isHistorical: true
+                };
+            }
+            
+            return {
+                branch: toTitleCase(String(user.branch || "").trim()),
+                type: (user.type || "").trim(),
+                pairs: user.pairs,
+                isHistorical: false
+            };
+        };
+
+        const checkLateReporting = (user, monthCode) => {
+            const isTransfer = user.previous_branch && String(user.previous_branch).trim() !== "";
+            if (isTransfer) return false; 
+            
+            if (!user.date_reported) return false;
+
+            let str = String(user.date_reported).trim();
+            const parts = str.split(/[-/]/);
+            if (parts.length >= 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const year = parseInt(parts[2], 10);
+                
+                const reportMonthCode = `${year}${String(month).padStart(2, '0')}`;
+                
+                if (monthCode === reportMonthCode && day > 5) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        const computePerformanceForUser = (user, perfData) => {
+            if (!user || !perfData) return;
+            user.performance = {};
+
+            for (const [key, metrics] of Object.entries(perfData || {})) {
+                const parts = key.split('_');
+                const monthCode = parts[parts.length - 1]; 
+
+                const profile = getActiveProfile(user, monthCode);
+                const targetBranch = (profile.branch || '').toLowerCase().trim();
+                const targetType = (profile.type || '').toUpperCase();
+                
+                const isBM = targetType.includes('BM') || targetType.includes('MANAGER');
+
+                if (isBM) {
+                    if (parts.length === 2 && parts[0] === targetBranch) {
+                        user.performance[monthCode] = metrics;
+                    }
+                } else {
+                    let rawPair = String(profile.pairs).toLowerCase().trim();
+                    if (rawPair === '1' || rawPair === '') rawPair = 'pair 1';
+                    else if (rawPair === '2') rawPair = 'pair 2';
+                    else if (rawPair === '3') rawPair = 'pair 3';
+                    
+                    const prefix = `${targetBranch}_${rawPair}_`;
+                    if (key.toLowerCase().startsWith(prefix)) {
+                        user.performance[monthCode] = metrics;
+                    }
                 }
             }
         };
@@ -312,9 +400,14 @@
 
                 sortedData.forEach(staff => {
                     const tr = document.createElement('tr');
+                    
+                    // Ops Manager Fix: Display correct historical branch in lists
+                    const activeProfile = getActiveProfile(staff, latestMonthCodeToQuery);
+                    const displayBranch = activeProfile.isHistorical ? `${activeProfile.branch} (Prev)` : activeProfile.branch;
+                    
                     tr.innerHTML = `
                         <td style="font-weight: 600;">${staff.name}</td>
-                        <td>${staff.branch || '-'}</td>
+                        <td>${displayBranch || '-'}</td>
                         <td>${staff.type || '-'}</td>
                         <td>${staff.customers}</td>
                         <td><button class="btn-view-staff" onclick="impersonateStaff('${staff.email}')">View Dashboard</button></td>
@@ -406,7 +499,6 @@
         };
 
         const renderDashboardData = (data, salary) => {
-            // 1. Update the top Status Badge
             const eligContainer = document.getElementById('eligibility-container');
             if (eligContainer) {
                 if (data.eligibility.date_disqualified) {
@@ -423,16 +515,13 @@
                 }
             }
 
-            // 2. Inject the highly visible warning into the Payout Card
             const totalPayoutEl = document.getElementById('res-total-payout');
             if (totalPayoutEl) {
                 let warningEl = document.getElementById('payout-date-warning');
                 
-                // Create the warning element if it doesn't exist yet
                 if (!warningEl) {
                     warningEl = document.createElement('div');
                     warningEl.id = 'payout-date-warning';
-                    // Insert it right above the Total Payout text
                     totalPayoutEl.parentNode.insertBefore(warningEl, totalPayoutEl);
                 }
                 
@@ -445,12 +534,10 @@
                     `;
                     warningEl.style.display = 'block';
                 } else {
-                    // Hide the warning if they arrived on time
                     warningEl.style.display = 'none';
                 }
             }
 
-            // 3. Render all the standard numerical values
             setElText('res-total-payout', formatKES(salary + data.current.base_bonus + data.collection.upside));
             setElText('res-basic-salary', formatKES(salary));
             setElText('res-bonus-earned', formatKES(data.current.base_bonus));
@@ -488,6 +575,9 @@
             if (!viewedUser) return;
             const getVal = (id) => parseFloat(document.getElementById(id)?.value) || 0;
 
+            const selectedMonth = document.getElementById('month-filter')?.value;
+            const activeProfile = getActiveProfile(viewedUser, selectedMonth);
+
             const currentMetrics = {
                 disbursement: getVal('disbursement'), active_customers: getVal('active_customers'),
                 new_customers: getVal('new_customers'), otc: getVal('otc'),
@@ -513,7 +603,6 @@
                 updateRowUI(k, ['diff-disbursement','diff-active-customers','diff-new-customers','diff-otc','diff-dd7','diff-new-cust-otc'][i], ['status-disbursement','status-active-customers','status-new-customers','status-otc','status-dd7','status-new-cust-otc'][i]);
             });
 
-            const selectedMonth = document.getElementById('month-filter')?.value;
             let disbActualVal = 0;
 
             if (viewedUser.performance && viewedUser.performance[selectedMonth]) {
@@ -534,8 +623,8 @@
             }
 
             let fixedSalary = 29108; 
-            const roleUpper = (viewedUser.type || '').toUpperCase();
-            const pairsStr = String(viewedUser.pairs || '');
+            const roleUpper = (activeProfile.type || '').toUpperCase();
+            const pairsStr = String(activeProfile.pairs || '');
 
             if (roleUpper.includes('BM') || roleUpper.includes('MANAGER')) {
                 if (pairsStr.includes('3')) fixedSalary = 77000;
@@ -543,28 +632,86 @@
                 else fixedSalary = 45397; 
             }
 
+            // GUARANTEE PYTHON NEVER DISQUALIFIES HISTORICAL TRANSFERS DUE TO DATE
+            let safeDateReported = viewedUser.date_reported || "";
+            if (activeProfile.isHistorical) {
+                safeDateReported = ""; // Pass an empty string so Python skips the date check completely
+            }
+
             const payload = {
-                employee_name: viewedUser.name, employee_id: viewedUser.id, employee_type: viewedUser.type, pairs: viewedUser.pairs,
-                salary: fixedSalary, customers: parseInt(document.getElementById('customers')?.value) || 0, disb_actual: disbActualVal,
+                employee_name: viewedUser.name, 
+                employee_id: viewedUser.id, 
+                employee_type: activeProfile.type, 
+                pairs: activeProfile.pairs,
+                salary: fixedSalary, 
+                customers: parseInt(document.getElementById('customers')?.value) || 0, 
+                disb_actual: disbActualVal,
                 disbursement: currentMetrics.disbursement / 100, active_customers: currentMetrics.active_customers / 100,
                 new_customers: currentMetrics.new_customers / 100, otc: currentMetrics.otc / 100, dd7: currentMetrics.dd7 / 100, new_customer_otc: currentMetrics.new_customer_otc / 100,
-                date_reported: viewedUser.date_reported || "",
+                date_reported: safeDateReported,
                 month: selectedMonth
             };
 
             try {
                 const res = await fetch('/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await res.json();
-                if (data.success) renderDashboardData(data, payload.salary);
+                
+                if (data.success) {
+                    
+                    if (activeProfile.isHistorical) {
+                        data.eligibility.date_disqualified = false;
+                    } 
+                    else if (checkLateReporting(viewedUser, selectedMonth)) {
+                        data.eligibility.date_disqualified = true;
+                        data.eligibility.full_bonus = false;
+                        data.eligibility.collection_bonus_45 = false;
+                        data.current.base_bonus = 0;
+                        data.collection.upside = 0;
+                        if (data.next_band) {
+                            data.next_band.potential_bonus = 0;
+                            data.next_band.bonus_opportunity = 0;
+                        }
+                    }
+                    renderDashboardData(data, payload.salary);
+                } else {
+                    console.error("Calculate API returned success: false");
+                }
             } catch (err) { console.error("Calculation Error:", err); }
         };
 
         const applyMonthPerformance = () => {
-            if (!viewedUser || !viewedUser.performance) return;
+            if (!viewedUser) return;
             const selectedMonth = document.getElementById('month-filter')?.value;
-            const p = viewedUser.performance[selectedMonth];
+            
+            const activeProfile = getActiveProfile(viewedUser, selectedMonth);
+            
+            const branchEl = document.getElementById('emp-info-branch');
+            if (branchEl) {
+                if (activeProfile.isHistorical) {
+                    branchEl.innerHTML = `${activeProfile.branch} <span style="color: var(--primary-amber); font-size: 10px;">(Previous)</span>`;
+                } else {
+                    branchEl.textContent = activeProfile.branch;
+                }
+            }
+            
+            setElText('emp-info-role', activeProfile.type);
+            setElText('emp-info-pairs', activeProfile.pairs);
 
-            if (p) {
+            let fixedSalary = 29108; 
+            const roleUpper = (activeProfile.type || '').toUpperCase();
+            const pairsStr = String(activeProfile.pairs || '');
+
+            if (roleUpper.includes('BM') || roleUpper.includes('MANAGER')) {
+                if (pairsStr.includes('3')) fixedSalary = 77000;
+                else if (pairsStr.includes('2')) fixedSalary = 67507;
+                else fixedSalary = 45397; 
+            }
+
+            const salaryEl = document.getElementById('emp-info-salary');
+            if (salaryEl) salaryEl.textContent = formatKES(fixedSalary);
+
+            if (viewedUser.performance && viewedUser.performance[selectedMonth]) {
+                const p = viewedUser.performance[selectedMonth];
                 const getRate = (a, t, rate) => (t > 0 && !isNaN(a) && !isNaN(t)) ? ((a / t) * 100).toFixed(2) : (rate ? (parseFloat(String(rate).replace('%','')) <= 1 ? (parseFloat(rate)*100).toFixed(2) : parseFloat(rate).toFixed(2)) : "0.00");
                 const parseRate = (v) => (!v) ? "0.00" : (parseFloat(String(v).replace('%','')) <= 1 ? (parseFloat(v)*100).toFixed(2) : parseFloat(v).toFixed(2));
 
@@ -617,6 +764,8 @@
 
             if (selectEl.querySelector(`option[value="${maxMonthCode}"]`)) selectEl.value = maxMonthCode;
             else if (selectEl.options.length > 0) selectEl.selectedIndex = 0;
+            
+            selectEl.removeEventListener('change', applyMonthPerformance); 
             selectEl.addEventListener('change', applyMonthPerformance);
         };
 
@@ -656,61 +805,9 @@
 
             setElText('emp-info-name', user.name);
             setElText('emp-info-id', user.id);
-            setElText('emp-info-role', user.type);
-            setElText('emp-info-branch', user.branch);
-            // ------------------------------------------
             
-            setElText('emp-info-pairs', user.pairs);
-            
-            let fixedSalary = 29108; 
-            const roleUpper = (user.type || '').toUpperCase();
-            const pairsStr = String(user.pairs || '');
-
-            if (roleUpper.includes('BM') || roleUpper.includes('MANAGER')) {
-                if (pairsStr.includes('3')) fixedSalary = 77000;
-                else if (pairsStr.includes('2')) fixedSalary = 67507;
-                else fixedSalary = 45397; 
-            }
-
-            const salaryEl = document.getElementById('emp-info-salary');
-            if (salaryEl) {
-                salaryEl.textContent = formatKES(fixedSalary);
-            }
-
             setupMonthFilter();
             applyMonthPerformance(); 
-        };
-
-        const computePerformanceForUser = (user, perfData) => {
-            if (!user || !perfData) return;
-            const branch = (user.branch || '').toLowerCase().trim();
-            const type = (user.type || '').toUpperCase();
-            const isBM = type.includes('BM') || type.includes('MANAGER');
-            user.performance = {};
-
-            if (isBM) {
-                for (const [key, metrics] of Object.entries(perfData || {})) {
-                    const parts = key.split('_');
-                    if (parts.length === 2 && parts[0] === branch) {
-                        const monthCode = parts[1];
-                        user.performance[monthCode] = metrics;
-                    }
-                }
-            } else {
-                let rawPair = String(user.pairs || '1').toLowerCase().trim();
-                if (rawPair === '1' || rawPair === '') rawPair = 'pair 1';
-                else if (rawPair === '2') rawPair = 'pair 2';
-                else if (rawPair === '3') rawPair = 'pair 3';
-                
-                const prefix = `${branch}_${rawPair}_`;
-                for (const [key, metrics] of Object.entries(perfData || {})) {
-                    if (key.toLowerCase().startsWith(prefix)) {
-                        const parts = key.split('_');
-                        const monthCode = parts[parts.length - 1];
-                        user.performance[monthCode] = metrics;
-                    }
-                }
-            }
         };
 
         window.impersonateStaff = (email) => {
@@ -768,35 +865,17 @@
                 const view = item.getAttribute('data-view');
                 const href = item.getAttribute('data-href');
                 
-                // 1. If the panel exists on the current page, just switch to it
                 if (view && document.getElementById(`view-${view}`)) {
                     handleNavigation(view);
                 } 
-                // 2. Otherwise, if there is a link, go to the new page
                 else if (href) {
                     window.location.href = href;
                 } 
-                // 3. Fallback: If it's a Dashboard/Ops button but we aren't on the overview page
                 else if (view === 'dashboard' || view === 'ops') {
                     window.location.href = '/overview';
                 }
             });
         });
-
-        document.querySelectorAll('.metric-row').forEach(row => {
-            row.addEventListener('click', (e) => {
-                if (e.target.tagName === 'INPUT') return;
-                const metricKey = row.getAttribute('data-metric');
-                const detailsRow = document.getElementById(`details-${metricKey}`);
-                row.classList.toggle('expanded');
-                if (detailsRow) detailsRow.classList.toggle('show');
-            });
-        });
-
-        const modalOverlay = document.getElementById('mobile-profile-modal');
-        document.getElementById('top-user-avatar')?.addEventListener('click', () => { if (modalOverlay) modalOverlay.classList.add('active'); });
-        document.getElementById('close-profile-modal')?.addEventListener('click', () => { if (modalOverlay) modalOverlay.classList.remove('active'); });
-        modalOverlay?.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('active'); });
 
         document.getElementById('ops-search-input')?.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
@@ -890,9 +969,7 @@
     }
 })();
 
-document.getElementById('btn-logout-drawer')?.addEventListener('click', () => { sessionStorage.clear(); window.location.href = '/'; });
-
-function renderGoogleButton() {
+window.renderGoogleButton = function() {
     const container = document.getElementById('g_id_signin_container');
     if (!container || typeof google === 'undefined' || !google.accounts) return;
 
@@ -909,10 +986,9 @@ function renderGoogleButton() {
     });
     
     google.accounts.id.prompt();
-}
+};
 
-window.addEventListener('load', () => setTimeout(renderGoogleButton, 300));
-document.getElementById('theme-toggle-btn')?.addEventListener('click', () => setTimeout(renderGoogleButton, 50));
+window.addEventListener('load', () => setTimeout(window.renderGoogleButton, 300));
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -922,9 +998,114 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+let deferredPrompt;
+const installBtn = document.getElementById('install-app-btn');
+
+if (installBtn) {
+    installBtn.style.display = 'none'; 
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (installBtn) {
+        installBtn.style.display = 'flex';
+    }
+});
+
+if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User install outcome: ${outcome}`);
+            deferredPrompt = null;
+            installBtn.style.display = 'none';
+        }
+    });
+}
+
+window.addEventListener('appinstalled', () => {
+    if (installBtn) {
+        installBtn.style.display = 'none';
+    }
+    deferredPrompt = null;
+    console.log('PWA installed successfully.');
+});
+
+document.addEventListener('click', (e) => {
+    if (e.target.closest('#top-user-avatar')) {
+        const modal = document.getElementById('mobile-profile-modal');
+        if (modal) modal.classList.add('active');
+    }
+
+    if (e.target.closest('#close-profile-modal') || e.target.id === 'mobile-profile-modal') {
+        const modal = document.getElementById('mobile-profile-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    const metricRow = e.target.closest('.metric-row');
+    if (metricRow && e.target.tagName !== 'INPUT') {
+        const metricKey = metricRow.getAttribute('data-metric');
+        const detailsRow = document.getElementById(`details-${metricKey}`);
+        if (detailsRow) {
+            metricRow.classList.toggle('expanded');
+            detailsRow.classList.toggle('show');
+        }
+    }
+
+    const themeBtn = e.target.closest('#theme-toggle-btn');
+    if (themeBtn) {
+        const sunSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+        const moonSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        themeBtn.innerHTML = newTheme === 'light' ? moonSVG : sunSVG;
+        
+        setTimeout(window.renderGoogleButton, 50);
+    }
+});
+
+document.getElementById('btn-logout-drawer')?.addEventListener('click', () => { 
+    sessionStorage.clear(); 
+    window.location.href = '/'; 
+});
+
 // ==========================================
-// UNIFIED SIDEBAR TICKETING SYSTEM
+// FORCE SYNC & CLEAR CACHE BUTTON
 // ==========================================
+document.getElementById('btn-force-sync')?.addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    btn.innerHTML = `<span style="opacity: 0.7;">Syncing Database...</span>`;
+    btn.style.pointerEvents = 'none';
+
+    // This is the exact command you were typing in the console!
+    fetch('/api/config/reload', { method: 'POST' })
+        .then(res => res.json())
+        .then(() => {
+            sessionStorage.clear(); // Wipes the stale browser memory
+            window.location.reload(true); // Forces a hard refresh of the page
+        })
+        .catch(err => {
+            console.error(err);
+            btn.innerHTML = 'Sync Failed';
+            btn.style.pointerEvents = 'auto';
+        });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (themeBtn) {
+        const initialTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const sunSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
+        const moonSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+        themeBtn.innerHTML = initialTheme === 'light' ? moonSVG : sunSVG;
+    }
+});
+
 let chatSyncInterval = null;
 let currentOpsChatTarget = null;
 
@@ -939,18 +1120,16 @@ const initChatSystem = () => {
     const closeChatBtn = document.getElementById('close-chat-btn');
     const chatBackBtn = document.getElementById('chat-back-btn');
 
-    // 1. Handle Opening the Drawer
     if (openChatBtn && chatDrawer) {
         openChatBtn.addEventListener('click', () => {
             chatDrawer.classList.add('open');
             if (chatOverlay) chatOverlay.classList.add('show');
             
-            // Configure view based on role
             const ticketList = document.getElementById('ops-ticket-list');
             const threadView = document.getElementById('chat-thread-view');
             
             if (user.is_ops) {
-                currentOpsChatTarget = null; // Reset target on fresh open
+                currentOpsChatTarget = null; 
                 if (ticketList) ticketList.style.display = 'block';
                 if (threadView) threadView.style.display = 'none';
                 document.getElementById('chat-header-title').textContent = 'Support Tickets';
@@ -961,11 +1140,10 @@ const initChatSystem = () => {
                 document.getElementById('chat-header-title').textContent = 'Support Chat';
             }
             
-            syncChatData(); // Fetch instantly
+            syncChatData(); 
         });
     }
 
-    // 2. Handle Closing the Drawer
     const closeDrawer = () => {
         if (chatDrawer) chatDrawer.classList.remove('open');
         if (chatOverlay) chatOverlay.classList.remove('show');
@@ -973,7 +1151,6 @@ const initChatSystem = () => {
     if (closeChatBtn) closeChatBtn.addEventListener('click', closeDrawer);
     if (chatOverlay) chatOverlay.addEventListener('click', closeDrawer);
 
-    // 3. Handle Ops "Back" Button
     if (chatBackBtn) {
         chatBackBtn.addEventListener('click', () => {
             currentOpsChatTarget = null;
@@ -987,7 +1164,6 @@ const initChatSystem = () => {
         });
     }
 
-    // 4. Send Message Binding (Universal Input for both Staff & Ops)
     const chatSendBtn = document.getElementById('chat-send-btn');
     const chatInput = document.getElementById('chat-input');
     if (chatSendBtn && chatInput) {
@@ -997,7 +1173,6 @@ const initChatSystem = () => {
         });
     }
 
-    // Background polling (checks for new messages every 5 seconds)
     if (chatSyncInterval) clearInterval(chatSyncInterval);
     chatSyncInterval = setInterval(syncChatData, 5000);
 };
@@ -1006,7 +1181,6 @@ const sendChatMessage = async (msgText, targetEmail = null) => {
     if (!msgText.trim()) return;
     const user = JSON.parse(sessionStorage.getItem('upia_user'));
     
-    // Clear the input field instantly
     const inputField = document.getElementById('chat-input');
     if (inputField) inputField.value = '';
 
@@ -1016,7 +1190,7 @@ const sendChatMessage = async (msgText, targetEmail = null) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 email: user.email,
-                name: user.name, // Sending Name for Audit
+                name: user.name, 
                 is_ops: user.is_ops,
                 message: msgText,
                 target_email: targetEmail
@@ -1034,7 +1208,6 @@ const syncChatData = async () => {
     if (!userStr) return;
     const user = JSON.parse(userStr);
 
-    // Save bandwidth: Only sync if the side drawer is actually open
     const drawerOpen = document.getElementById('chat-drawer')?.classList.contains('open');
     if (!drawerOpen) return; 
 
@@ -1052,8 +1225,6 @@ const syncChatData = async () => {
 };
 
 const renderChatUI = (chatData, user) => {
-    
-    // Helper function to format timestamp beautifully
     const formatTime = (ts) => {
         return new Date(ts * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
@@ -1096,15 +1267,12 @@ const renderChatUI = (chatData, user) => {
     };
 
     if (!user.is_ops) {
-        // Render Staff View
         renderMessages(chatData, false);
     } else {
-        // Render Ops Ticket List
         const threadList = document.getElementById('ops-ticket-list');
         if (threadList) {
             threadList.innerHTML = '';
             
-            // Sort chats by most recent message
             const sortedChats = Object.entries(chatData).sort((a, b) => {
                 const lastA = a[1].length > 0 ? a[1][a[1].length - 1].timestamp : 0;
                 const lastB = b[1].length > 0 ? b[1][b[1].length - 1].timestamp : 0;
@@ -1123,7 +1291,6 @@ const renderChatUI = (chatData, user) => {
                 
                 threadEl.style.cssText = `padding: 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;`;
                 
-                // Detailed Preview Audit
                 const previewPrefix = lastMsg.sender_role === 'ops' 
                     ? `<strong style="color: var(--primary-color);">${lastMsg.sender_name}:</strong> ` 
                     : `<strong style="color: #f59e0b;">Action Required:</strong> `;
@@ -1150,43 +1317,10 @@ const renderChatUI = (chatData, user) => {
             });
         }
         
-        // Re-render active thread if Ops is actively chatting
         if (currentOpsChatTarget && chatData[currentOpsChatTarget]) {
             renderMessages(chatData[currentOpsChatTarget], true);
         }
     }
 };
 
-// Initialize
 setTimeout(initChatSystem, 1500);
-
-let deferredPrompt;
-const installBtn = document.getElementById('pwa-install-btn');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (installBtn) {
-        installBtn.style.display = 'flex';
-    }
-});
-
-if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`User install outcome: ${outcome}`);
-            deferredPrompt = null;
-            installBtn.style.display = 'none';
-        }
-    });
-}
-
-window.addEventListener('appinstalled', () => {
-    if (installBtn) {
-        installBtn.style.display = 'none';
-    }
-    deferredPrompt = null;
-    console.log('PWA installed successfully.');
-});

@@ -99,21 +99,48 @@ html, body {
    TOP NAVIGATION
    ========================================== */
 .top-navbar {
-    height: 56px;
+    height: 72px; /* INCREASED HEADER HEIGHT */
     background-color: var(--nav-bg);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 24px;
     border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
     z-index: 1000;
     width: 100%;
+    flex-shrink: 0;
 }
 
 .nav-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; color: var(--text-main); }
 .nav-brand img { width: 24px; height: 24px; border-radius: 6px; object-fit: cover; }
+
+.top-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header-theme-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.header-theme-btn:hover {
+    background: var(--card-bg);
+    transform: scale(1.05);
+    box-shadow: var(--shadow-sm);
+}
 
 .top-nav-links { display: flex; gap: 4px; }
 .top-link {
@@ -158,7 +185,7 @@ html, body {
    ========================================== */
 .app-layout { 
     display: flex; 
-    min-height: calc(100vh - 56px); 
+    min-height: calc(100vh - 72px); 
     width: 100%;
     overflow-x: hidden;
 }
@@ -495,16 +522,18 @@ input::-webkit-inner-spin-button {
 .status-badge.met { background: var(--success-bg); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.15); }
 .status-badge.missed { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.15); }
 
+/* METRICS TABLE ROW INTERACTION FIXES */
 .metric-row { cursor: pointer; transition: background 0.2s ease; }
-.metric-row:hover { background: rgba(0,0,0,0.015); }
-[data-theme="dark"] .metric-row:hover { background: rgba(255,255,255,0.02); }
+.metric-row:hover { background: rgba(0,0,0,0.02) !important; }
+[data-theme="dark"] .metric-row:hover { background: rgba(255,255,255,0.03) !important; }
 
 .expand-icon { display: inline-block; font-weight: 700; margin-right: 6px; transition: transform 0.2s ease; color: var(--text-muted); }
 .metric-row.expanded .expand-icon { transform: rotate(90deg); color: var(--primary-amber); }
 
-.details-row { display: none; background: rgba(0,0,0,0.02); }
-[data-theme="dark"] .details-row { background: rgba(255,255,255,0.02); }
-.details-row.show { display: table-row; }
+/* DETAILS ROW DISPLAY FIXES */
+.details-row { display: none !important; background: rgba(0,0,0,0.02) !important; }
+[data-theme="dark"] .details-row { background: rgba(255,255,255,0.02) !important; }
+.details-row.show { display: table-row !important; }
 
 .metric-details-box { padding: 10px 16px; font-size: 11px; color: var(--text-main); display: flex; gap: 24px; border-left: 3px solid var(--primary-amber); margin: 4px 0; }
 .metric-details-box strong { color: var(--text-main); font-weight: 600; }
@@ -512,29 +541,6 @@ input::-webkit-inner-spin-button {
 .diff-val { font-weight: 600; font-size: 11px; }
 .diff-val.positive { color: var(--success); }
 .diff-val.negative { color: var(--danger); }
-
-/* ==========================================
-   FLOATING THEME BUTTON
-   ========================================== */
-.floating-theme-btn {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-floating);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    z-index: 9999;
-    color: var(--text-main);
-}
-.floating-theme-btn:hover { transform: scale(1.05); }
 
 /* ==========================================
    MONTH FILTER DROPDOWN
@@ -568,7 +574,7 @@ input::-webkit-inner-spin-button {
     z-index: 99999 !important;
     justify-content: flex-end !important; /* Anchors content to top right */
     align-items: flex-start !important;
-    padding-top: 56px !important; /* Height of navbar */
+    padding-top: 72px !important; /* HEIGHT ADJUSTED TO MATCH NEW NAVBAR */
     padding-right: 16px !important; /* Aligns directly below avatar */
     box-sizing: border-box !important;
 }
@@ -665,9 +671,15 @@ input::-webkit-inner-spin-button {
     .card, .slim-profile-card { margin-bottom: 8px !important; padding: 12px 14px !important; border-radius: var(--radius-md) !important; }
     .hero-top-stack, .dashboard-columns { gap: 8px !important; margin-bottom: 8px !important; }
 
-    .top-navbar { padding: 0 16px; height: 48px; border-bottom: none !important; }
+    .top-navbar { padding: 0 16px; height: 64px !important; border-bottom: none !important; }
     .top-nav-links, .user-meta { display: none; }
-    .app-layout { flex-direction: column !important; }
+    
+    /* UPDATED MOBILE LAYOUT TO ACCOUNT FOR NEW 64px HEADER */
+    .app-layout { 
+        flex-direction: column-reverse !important;
+        height: calc(100vh - 64px) !important; 
+        overflow: hidden !important; 
+    }
 
     /* Mobile Sub-Header (Prevents overlapping main workspace) */
     .sidebar { 
@@ -705,6 +717,7 @@ input::-webkit-inner-spin-button {
         text-align: left !important;
     }
 }
+
 /* ==========================================
    PERFORMANCE METRICS TABLE FIX
    ========================================== */
@@ -722,7 +735,7 @@ input::-webkit-inner-spin-button {
 .data-table td {
     padding: 10px 12px !important;
     vertical-align: middle !important;
-    white-space: nowrap !important;
+    white-space: normal !important; /* FIXED DESKTOP TAMPERING */
 }
 
 /* 3. Single-line Achieved input + % symbol */
@@ -755,6 +768,7 @@ input::-webkit-inner-spin-button {
     font-weight: 600 !important;
     line-height: 1 !important;
 }
+
 /* ==========================================
    OPS MANAGER TABS & LIST
    ========================================== */
@@ -792,6 +806,7 @@ input::-webkit-inner-spin-button {
 }
 [data-theme="dark"] .btn-view-staff { background: #334155; }
 [data-theme="dark"] .btn-view-staff:hover { background: var(--primary-blue); }
+
 /* =========================================================
    1. GLOBAL FONT SIZE INCREASES 
 ========================================================= */
@@ -819,7 +834,6 @@ p, .welcome-sub { font-size: 15px; }
 }
 .table-input, select { font-size: 15px; }
 .btn-primary, .btn-secondary, .ops-tab-btn { font-size: 15px; }
-
 
 /* =========================================================
    2. STAFF DIRECTORY & TABLE ENHANCEMENTS
@@ -905,6 +919,7 @@ p, .welcome-sub { font-size: 15px; }
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
     outline: none;
 }
+
 /* =========================================================
    3. PAGINATION CONTROLS & BOTTOM NAVIGATION
 ========================================================= */
@@ -959,6 +974,7 @@ p, .welcome-sub { font-size: 15px; }
 .pagination-controls .btn-secondary:active {
     transform: translateY(1px);
 }
+
 /* =========================================================
    4. PWA INSTALL FAB (Bottom Left)
 ========================================================= */
@@ -985,6 +1001,7 @@ p, .welcome-sub { font-size: 15px; }
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
 }
+
 /* ==========================================
    DASHBOARD SCROLL LOCK (STICKY HEADER & SIDEBAR)
    ========================================== */
@@ -1028,6 +1045,7 @@ body {
     flex-grow: 1;
     scroll-behavior: smooth;
 }
+
 /* ==========================================
    MOBILE LAYOUT FIX (RESTORE CONTENT & BOTTOM NAV)
    ========================================== */
@@ -1035,7 +1053,7 @@ body {
     /* 1. Stack main content on top and navigation bar at the bottom */
     .app-layout {
         flex-direction: column-reverse !important;
-        height: calc(100vh - 56px) !important; /* Account for top navbar */
+        height: calc(100vh - 64px) !important; /* Account for top navbar */
         overflow: hidden !important;
     }
 
@@ -1055,6 +1073,7 @@ body {
         padding-bottom: 32px !important;
     }
 }
+
 /* ==========================================
    HIDE SCROLLBARS & FULL-WIDTH WORKSPACE
    ========================================== */
@@ -1079,4 +1098,306 @@ body {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
+}
+
+/* ==========================================
+   ICON VISIBILITY & SIZE ENHANCEMENTS
+   ========================================== */
+
+/* Brand Header Logo Icon */
+.nav-brand img {
+    width: 30px !important;
+    height: 30px !important;
+}
+
+/* Sidebar & Navigation Menu Icons */
+.sidebar-menu .ui-icon {
+    width: 24px !important;
+    height: 24px !important;
+    stroke-width: 2.2px !important;
+    flex-shrink: 0;
+}
+
+/* Support Contact Card & Button Icons */
+.support-icon-wrap {
+    width: 65px !important;
+    height: 65px !important;
+}
+
+.support-icon-wrap svg {
+    width: 38px !important;
+    height: 38px !important;
+    stroke-width: 2.2px !important;
+}
+
+#open-chat-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
+/* Mobile Bottom Navigation Icons Specific Tuning */
+@media (max-width: 768px) {
+    .sidebar-menu {
+        display: flex !important;
+        justify-content: space-around !important;
+        align-items: center !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .sidebar-menu .menu-item {
+        padding: 6px 12px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+    }
+
+    .sidebar-menu .ui-icon {
+        width: 26px !important;
+        height: 26px !important;
+        stroke-width: 2.4px !important;
+    }
+}
+
+/* BRAND HEADER LOGO ENHANCEMENT */
+.nav-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.nav-brand img {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border-radius: 8px !important;
+    object-fit: cover !important;
+}
+
+.logo-text {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+}
+
+/* ==========================================
+   MOBILE VIEW & NAVIGATION OPTIMIZATIONS
+   ========================================== */
+@media (max-width: 768px) {
+
+    /* 1. Header Font & Padding Reduction */
+    .top-navbar {
+        padding: 8px 14px !important;
+        height: 64px !important; /* UPDATED FOR TALLER NAVBAR */
+    }
+
+    .nav-brand {
+        gap: 8px !important;
+    }
+
+    .nav-brand img {
+        width: 26px !important;
+        height: 26px !important;
+        min-width: 26px !important;
+        min-height: 26px !important;
+    }
+
+    .logo-text {
+        font-size: 14px !important; /* Reduced header font size */
+        font-weight: 600 !important;
+    }
+
+    /* 2. Workspace Layout & Scroll Containment */
+    #app-wrapper {
+        height: 100vh !important;
+        overflow: hidden !important;
+    }
+
+    .app-layout {
+        display: flex !important;
+        flex-direction: column !important;
+        height: calc(100vh - 64px) !important;
+        position: relative !important;
+    }
+
+    .main-workspace {
+        flex: 1 1 auto !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        padding-bottom: 85px !important; /* Prevents content from being hidden behind fixed menu */
+    }
+
+    /* 3. Fixed, Medium-Sized Bottom Menu (Always Visible) */
+    .sidebar {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 62px !important; /* Medium touch-friendly height */
+        background: var(--card-bg) !important;
+        border-top: 1px solid var(--border-color) !important;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15) !important;
+        z-index: 1000 !important;
+        padding: 0 !important;
+    }
+
+    .sidebar-menu {
+        display: flex !important;
+        justify-content: space-around !important;
+        align-items: center !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 4px !important;
+    }
+
+    .sidebar-menu .menu-item {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        height: 100% !important;
+        border-radius: 6px !important;
+    }
+
+    .sidebar-menu .ui-icon {
+        width: 22px !important;
+        height: 22px !important;
+        stroke-width: 2px !important;
+    }
+
+    .sidebar-menu .menu-text {
+        font-size: 11px !important;
+        font-weight: 500 !important;
+    }
+
+    /* 4. Compact Floating Download Icon Button */
+    #install-app-btn,
+    .install-app-btn {
+        position: fixed !important;
+        bottom: 74px !important; /* Floats safely above bottom menu */
+        left: 14px !important;
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        border-radius: 50% !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        z-index: 999 !important;
+        font-size: 0 !important; /* Hides text */
+    }
+
+    #install-app-btn::before,
+    .install-app-btn::before {
+        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='7 10 12 15 17 10'/%3E%3Cline x1='12' y1='15' x2='12' y2='3'/%3E%3C/svg%3E");
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+/* ==========================================
+   FIX 1: GLOBAL DESKTOP INSTALL BUTTON (FAB)
+   ========================================== */
+#install-app-btn {
+    position: fixed !important;
+    bottom: 24px !important;
+    left: 24px !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    background-color: #10b981 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 50px !important;
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+#install-app-btn:hover {
+    background-color: #059669 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5) !important;
+}
+
+/* ==========================================
+   FIX 2: MOBILE BOTTOM NAV & MOBILE FAB
+   ========================================== */
+@media (max-width: 768px) {
+    /* Force Sidebar to the BOTTOM and REMOVE top anchoring */
+    .sidebar {
+        position: fixed !important;
+        top: auto !important; /* THIS KILLS THE ROGUE TOP ALIGNMENT */
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        height: 62px !important;
+        background: var(--nav-bg) !important;
+        border-top: 1px solid var(--border-color) !important;
+        border-bottom: none !important;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1) !important;
+        z-index: 9999 !important;
+        flex-direction: row !important;
+        padding: 0 !important;
+    }
+
+    /* Convert Desktop Install Button to Mobile Circular Icon */
+    #install-app-btn {
+        bottom: 80px !important; /* Safely above the 62px bottom nav */
+        left: 16px !important;
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+        justify-content: center !important;
+    }
+    
+    #install-app-btn .btn-label {
+        display: none !important; /* Hides text on mobile */
+    }
+    
+    #install-app-btn svg {
+        margin: 0 !important;
+        width: 24px !important;
+        height: 24px !important;
+    }
+}
+/* ==========================================
+   FIX 3: REMOVE DUPLICATE MOBILE DOWNLOAD ICON
+   ========================================== */
+@media (max-width: 768px) {
+    /* 1. Kill the CSS-injected duplicate icon */
+    #install-app-btn::before,
+    .install-app-btn::before {
+        content: none !important;
+        display: none !important;
+    }
+
+    /* 2. Center the real HTML SVG perfectly */
+    #install-app-btn {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    #install-app-btn svg {
+        margin: 0 !important;
+        display: block !important;
+    }
 }
