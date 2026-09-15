@@ -1401,3 +1401,19 @@ body {
         display: block !important;
     }
 }
+/* ==========================================
+   MOVE INSTALL BUTTON TO BOTTOM RIGHT
+   ========================================== */
+/* Desktop */
+#install-app-btn, .fab-install-btn, .install-app-btn {
+    left: auto !important; 
+    right: 24px !important;
+}
+
+/* Mobile Viewport */
+@media (max-width: 768px) {
+    #install-app-btn, .fab-install-btn, .install-app-btn {
+        left: auto !important;
+        right: 16px !important;
+    }
+}
