@@ -211,7 +211,7 @@
                             <div class="table-responsive" style="flex-grow: 1; overflow-y: auto;">
                                 <table class="data-table" id="ops-staff-table">
                                     <thead style="position: sticky; top: 0; background: var(--card-bg); z-index: 10;">
-                                        <tr><th>Staff Name</th><th>Branch</th><th>Pair</th><th>Role</th><th>Action</th></tr>
+                                        <tr><th>Staff Name</th><th>Branch</th><th>Pair</th><th>Role</th><th>Staff ID</th></tr>
                                     </thead>
                                     <tbody id="skeleton-staff-tbody">
                                         <tr><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text-short"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-text"></div></td><td><div class="skeleton skel-btn"></div></td></tr>
@@ -340,6 +340,6 @@
 
    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script id="staff-data-json" type="application/json">{{ employees_json | safe }}</script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=2.0"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=4.0"></script>
 </body>
 </html>

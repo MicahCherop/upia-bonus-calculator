@@ -41,16 +41,26 @@ def calculate_bonus(data, config):
     dd7_ok = round(float(data.get('dd7', 0)), 4) >= criteria.get('dd7', 0.94)
     new_otc_ok = round(float(data.get('new_customer_otc', 0)), 4) >= criteria.get('new_customer_otc', 0.90)
 
+    # --- WAIVE NEW CUSTOMER OTC FOR JULY 2026 AND EARLIER ---
+    month_code = str(data.get('month', '')).strip() 
+    if month_code and month_code <= "202607":
+        new_otc_ok = True 
+    # --------------------------------------------------------
+
     full_bonus = disb_ok and ac_ok and nc_ok and otc_ok and dd7_ok and new_otc_ok
     collection_bonus_45 = (not full_bonus) and (otc_ok and dd7_ok and new_otc_ok)
 
     # --- DATE REPORTED LOGIC ---
-    # .split(' ')[0] ensures we drop any accidental timestamps (e.g., "26-6-2026 14:30:00")
     date_reported_str = str(data.get('date_reported', '')).strip().split(' ')[0]
-    month_code = str(data.get('month', '')).strip() 
     date_disqualified = False 
     
-    if date_reported_str and month_code and len(month_code) == 6:
+    # 1. Instantly disqualify if they have no date, blank string, or N/A
+    if not date_reported_str or date_reported_str.lower() in ['n/a', 'na', 'none', 'not reported']:
+        date_disqualified = True
+        full_bonus = False
+        collection_bonus_45 = False
+        
+    elif month_code and len(month_code) == 6:
         from datetime import datetime, date
         
         def _parse_date(d_str):
@@ -62,7 +72,6 @@ def calculate_bonus(data, config):
             ]
             for fmt in formats:
                 try:
-                    # Return a strict Date object (no time attached)
                     return datetime.strptime(d_str, fmt).date()
                 except ValueError:
                     continue
@@ -74,10 +83,8 @@ def calculate_bonus(data, config):
                 perf_year = int(month_code[:4])
                 perf_month = int(month_code[4:6])
                 
-                # Create a strict cutoff date: The 5th day of the performance month
                 cutoff_date = date(perf_year, perf_month, 5)
                 
-                # Rule: If they reported AFTER the 5th of the performance month, disqualify them
                 if rep_date > cutoff_date:
                     full_bonus = False
                     collection_bonus_45 = False
@@ -148,26 +155,12 @@ def calculate_bonus(data, config):
                     
                     cust_needed = next_min - customers if next_min > customers else 0
 
+                    # ALWAYS use the Full Bonus multiplier for the potential earnings
                     next_full_mult = next_b.get('full_mult', next_b.get('multiplier', 0.0))
-                    
-                    if is_bm:
-                        next_partial_mult = next_b.get('partial_mult', next_full_mult * 0.45)
-                    else:
-                        if next_max <= 200:
-                            next_partial_mult = 0.25
-                        elif next_max <= 350:
-                            next_partial_mult = 0.30
-                        elif next_max <= 500:
-                            next_partial_mult = 0.45
-                        else:
-                            next_partial_mult = 0.50
+                    pot_bonus = salary * next_full_mult
 
-                    pot_bonus = 0.0
-                    if full_bonus:
-                        pot_bonus = salary * next_full_mult
-                    elif collection_bonus_45:
-                        pot_bonus = salary * next_partial_mult
-
+                    # Growth value (Opportunity) is the difference between what they 
+                    # actually earned this month vs what they COULD earn next band
                     curr_bonus = salary * active_multiplier
                     opp = pot_bonus - curr_bonus
 
@@ -227,7 +220,14 @@ def calculate_bonus(data, config):
                 if dd7_val >= (thresh - 0.0001):
                     if amt > best_payout:
                         best_payout = amt
-            collection_upside = best_payout
+            
+            # --- NEW FOUNDER'S BONUS SCALING LOGIC ---
+            if full_bonus:
+                collection_upside = best_payout * 1.0   # 100% of Founder's Bonus
+            elif collection_bonus_45:
+                collection_upside = best_payout * 0.50  # 50% of Founder's Bonus
+            else:
+                collection_upside = best_payout * 0.40  # 40% of Founder's Bonus
 
     return {
         "eligibility": eligibility,
@@ -244,6 +244,7 @@ def calculate_bonus(data, config):
             "upside": collection_upside
         }
     }
+
 def evaluate_criteria(data, criteria_targets, emp_type=""):
     results = []
     

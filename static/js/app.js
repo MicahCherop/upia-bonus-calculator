@@ -167,19 +167,43 @@
             const isTransfer = user.previous_branch && String(user.previous_branch).trim() !== "";
             if (isTransfer) return false; 
             
-            if (!user.date_reported) return false;
+            // 1. If they have NO date in the system, they are disqualified
+            if (!user.date_reported) return true; 
 
-            let str = String(user.date_reported).trim();
+            let str = String(user.date_reported).trim().split(' ')[0];
+            
+            // 2. Catch blank or "N/A" text
+            if (str === "" || str.toLowerCase().includes("n/a") || str.toLowerCase() === "none" || str.toLowerCase() === "not reported") {
+                return true; 
+            }
+
             const parts = str.split(/[-/]/);
             if (parts.length >= 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10);
-                const year = parseInt(parts[2], 10);
+                let day, month, year;
+                
+                // 3. Dynamically read both YYYY-MM-DD and DD-MM-YYYY formats
+                if (parts[0].length === 4) { 
+                    year = parseInt(parts[0], 10);
+                    month = parseInt(parts[1], 10);
+                    day = parseInt(parts[2], 10);
+                } else { 
+                    day = parseInt(parts[0], 10);
+                    month = parseInt(parts[1], 10);
+                    year = parseInt(parts[2], 10);
+                }
                 
                 const reportMonthCode = `${year}${String(month).padStart(2, '0')}`;
                 
-                if (monthCode === reportMonthCode && day > 5) {
-                    return true;
+                if (monthCode === reportMonthCode && day > 5) return true;
+                if (monthCode < reportMonthCode) return true;
+            } else {
+                // 4. Fallback for word-based dates (e.g., 10-Sep-2026)
+                const d = new Date(str);
+                if (!isNaN(d.getTime())) {
+                    const day = d.getDate();
+                    const reportMonthCode = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    if (monthCode === reportMonthCode && day > 5) return true;
+                    if (monthCode < reportMonthCode) return true;
                 }
             }
             return false;
@@ -251,21 +275,28 @@
 
             pageData.forEach(staff => {
                 const tr = document.createElement('tr');
+                
+                // Row click & hover logic
+                tr.style.cursor = 'pointer';
+                tr.onmouseover = () => tr.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'; 
+                tr.onmouseout = () => tr.style.backgroundColor = '';
+                tr.onclick = () => impersonateStaff(staff.email);
+                
+                // Inject the 5 columns (Notice there is no button HTML here)
                 tr.innerHTML = `
                     <td style="font-weight: 600;">${staff.name}</td>
+                    <td>${staff.email}</td>
                     <td>${staff.branch || '-'}</td>
-                    <td>${staff.pairs || '-'}</td>
                     <td>${staff.type || '-'}</td>
-                    <td><button class="btn-view-staff" onclick="impersonateStaff('${staff.email}')">View</button></td>
+                    <td>${staff.id || '-'}</td>
                 `;
                 tbody.appendChild(tr);
             });
-
             const pageInfo = document.getElementById('ops-page-info');
             if (pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${totalItems} items)`;
         };
 
-        const renderOpsAnalytics = (perfData) => {
+       const renderOpsAnalytics = (perfData) => {
             const ctxBonus = document.getElementById('opsBonusChart');
             const ctxBand = document.getElementById('opsBandChart');
             if (!ctxBonus || !ctxBand || typeof Chart === 'undefined' || !perfData) return;
@@ -274,23 +305,30 @@
                 if (!staff.performance) computePerformanceForUser(staff, perfData);
             });
 
+            // 1. DATE FILTER (Force start from January)
             const today = new Date();
-            const maxDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+            const currentYear = today.getFullYear();
+            const maxDate = new Date(currentYear, today.getMonth() - 2, 1);
             const maxMonthCode = `${maxDate.getFullYear()}${String(maxDate.getMonth() + 1).padStart(2, '0')}`;
+            const minMonthCode = `${currentYear}01`; 
 
             const monthSet = new Set();
+            if (maxDate.getFullYear() === currentYear) {
+                for (let m = 1; m <= maxDate.getMonth() + 1; m++) {
+                    monthSet.add(`${currentYear}${String(m).padStart(2, '0')}`);
+                }
+            }
+
             allStaffData.forEach(staff => {
                 if (staff.performance) {
                     Object.keys(staff.performance).forEach(m => {
-                        if (m <= maxMonthCode) {
-                            monthSet.add(m);
-                        }
+                        if (m >= minMonthCode && m <= maxMonthCode) monthSet.add(m);
                     });
                 }
             });
             const sortedMonths = Array.from(monthSet).sort();
 
-            const checkEligibility = (p) => {
+            const checkEligibility = (p, mCode) => {
                 const getRate = (a, t, rate) => (t > 0 && !isNaN(a) && !isNaN(t)) ? ((a / t) * 100) : (rate ? (parseFloat(String(rate).replace('%','')) <= 1 ? (parseFloat(rate)*100) : parseFloat(rate)) : 0.0);
                 const parseRate = (v) => (!v) ? 0.0 : (parseFloat(String(v).replace('%','')) <= 1 ? (parseFloat(v)*100) : parseFloat(v));
 
@@ -303,7 +341,10 @@
 
                 const round2 = (num) => Math.round((num + Number.EPSILON) * 100) / 100;
 
-                const passes_nc_otc = round2(nc_otc) >= 90.00;
+                let passes_nc_otc = round2(nc_otc) >= 90.00;
+                
+                if (mCode <= '202607') passes_nc_otc = true;
+
                 const passes_collections = round2(otc) >= 91.50 && round2(dd7) >= 94.00 && passes_nc_otc;
                 const passes_sales = round2(disb) >= 98.00 && round2(ac) >= 95.00 && round2(nc) >= 95.00;
 
@@ -337,9 +378,16 @@
                 let eCount = 0, gCount = 0, bCount = 0, flCount = 0;
 
                 allStaffData.forEach(staff => {
+                    const activeProfile = getActiveProfile(staff, mCode);
+                    
+                    // 2. EXCLUDE NON-REPORTING STAFF
+                    if (!activeProfile.isHistorical && checkLateReporting(staff, mCode)) {
+                        return; 
+                    }
+
                     const p = staff.performance ? staff.performance[mCode] : null;
                     if (p) {
-                        const elig = checkEligibility(p);
+                        const elig = checkEligibility(p, mCode);
                         const cust = parseInt(p.ac_actual) || 0;
 
                         if (elig.full) fCount++;
@@ -392,33 +440,224 @@
                 'kpi-card-missed': { title: 'Staff: Did Not Qualify', data: latestStaffCategorization.missed }
             };
 
-            const renderKpiTable = (title, data) => {
-                document.getElementById('kpi-staff-list-title').textContent = title;
-                const tbody = document.getElementById('kpi-staff-tbody');
-                tbody.innerHTML = '';
+            // 3. BULLETPROOF renderKpiTable
+            async function renderKpiTable(title, data) {
+                const titleEl = document.getElementById('kpi-staff-list-title');
+                if (!titleEl) return;
                 
-                const sortedData = data.sort((a, b) => b.customers - a.customers);
+                titleEl.textContent = title;
+
+                if (titleEl.parentElement) {
+                    titleEl.parentElement.style.position = 'relative';
+                    titleEl.parentElement.style.display = 'flex';
+                    titleEl.parentElement.style.alignItems = 'center';
+                }
+
+                let oldMenu = document.getElementById('export-menu-container');
+                if (oldMenu) oldMenu.remove(); 
+
+                const exportMenu = document.createElement('div');
+                exportMenu.id = 'export-menu-container';
+                exportMenu.style.cssText = 'position: absolute; right: 0; top: 50%; transform: translateY(-50%);';
+
+                const btnTrigger = document.createElement('button');
+                btnTrigger.style.cssText = 'background: transparent; border: none; cursor: pointer; padding: 4px; color: inherit; display: flex; align-items: center; justify-content: center;';
+                btnTrigger.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>`;
+
+                const dropdownBox = document.createElement('div');
+                dropdownBox.style.cssText = 'display: none; position: absolute; right: 0; top: 100%; margin-top: 5px; background: var(--card-bg, #ffffff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; min-width: 220px; overflow: hidden; color: inherit;';
+
+                const btnCsv = document.createElement('div');
+                btnCsv.style.cssText = 'padding: 12px 16px; cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 1px solid var(--border-color, #e2e8f0); display: flex; align-items: center; gap: 8px; color: inherit;';
+                btnCsv.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Download as CSV File`;
+
+                const btnSheets = document.createElement('div');
+                btnSheets.style.cssText = 'padding: 12px 16px; cursor: pointer; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; color: inherit;';
+                btnSheets.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><line x1="12" y1="13" x2="12" y2="17"></line></svg> Copy for Google Sheets`;
+
+                dropdownBox.appendChild(btnCsv);
+                dropdownBox.appendChild(btnSheets);
+                exportMenu.appendChild(btnTrigger);
+                exportMenu.appendChild(dropdownBox);
+                titleEl.insertAdjacentElement('afterend', exportMenu);
+
+                btnTrigger.onclick = (e) => {
+                    e.stopPropagation();
+                    dropdownBox.style.display = dropdownBox.style.display === 'none' ? 'block' : 'none';
+                };
+                
+                document.addEventListener('click', (e) => {
+                    if (!exportMenu.contains(e.target)) dropdownBox.style.display = 'none';
+                });
+
+                const tbody = document.getElementById('kpi-staff-tbody');
+                document.getElementById('kpi-staff-list-container').style.display = 'block';
+                
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Calculating exact payouts... Please wait.</td></tr>';
+
+                const theadTr = tbody.parentElement.querySelector('thead tr');
+                if (theadTr) {
+                    const headers = theadTr.querySelectorAll('th');
+                    if (headers.length >= 4) headers[3].textContent = 'Staff ID';
+
+                    // DESTROY THE ACTION HEADER
+                    const lastHeader = headers[headers.length - 1];
+                    if (lastHeader && (lastHeader.textContent.includes('Action') || lastHeader.textContent.includes('View'))) {
+                        lastHeader.remove();
+                    }
+
+                    if (!document.getElementById('th-payout')) {
+                        const th = document.createElement('th');
+                        th.id = 'th-payout';
+                        th.textContent = 'Total Payout';
+                        theadTr.appendChild(th); 
+                    }
+                }
+
+                const payloads = data.map(staff => {
+                    const activeProfile = getActiveProfile(staff, latestMonthCodeToQuery);
+                    let fixedSalary = 29108; 
+                    const roleUpper = (activeProfile.type || '').toUpperCase();
+                    const pairsStr = String(activeProfile.pairs || '');
+
+                    if (roleUpper.includes('BM') || roleUpper.includes('MANAGER')) {
+                        if (pairsStr.includes('3')) fixedSalary = 77000;
+                        else if (pairsStr.includes('2')) fixedSalary = 67507;
+                        else fixedSalary = 45397; 
+                    }
+
+                    let safeDateReported = staff.date_reported || "";
+                    if (activeProfile.isHistorical) safeDateReported = "01-01-2000"; 
+
+                    const p = staff.performance ? staff.performance[latestMonthCodeToQuery] : null;
+                    const getRate = (a, t, rate) => (t > 0 && !isNaN(a) && !isNaN(t)) ? ((a / t) * 100) : (rate ? (parseFloat(String(rate).replace('%','')) <= 1 ? (parseFloat(rate)*100) : parseFloat(rate)) : 0.0);
+                    const parseRate = (v) => (!v) ? 0.0 : (parseFloat(String(v).replace('%','')) <= 1 ? (parseFloat(v)*100) : parseFloat(v));
+
+                    let disbVal = 0, acVal = 0, ncVal = 0, otcVal = 0, dd7Val = 0, ncOtcVal = 0, disbAct = 0, custCount = 0;
+                    if (p) {
+                        disbVal = getRate(p.disb_actual, p.disb_target, p.disb_rate) / 100;
+                        acVal = getRate(p.ac_actual, p.ac_target, p.ac_rate) / 100;
+                        ncVal = getRate(p.nc_actual, p.nc_target, p.nc_rate) / 100;
+                        otcVal = parseRate(p.overall_otc) / 100;
+                        dd7Val = parseRate(p.dd7_rate) / 100;
+                        ncOtcVal = parseRate(p.new_customer_otc) / 100;
+                        disbAct = parseFloat(p.disb_actual) || 0;
+                        custCount = parseInt(p.ac_actual) || 0;
+                    }
+
+                    return {
+                        email: staff.email, employee_name: staff.name, employee_id: staff.id, 
+                        employee_type: activeProfile.type, pairs: activeProfile.pairs, salary: fixedSalary, 
+                        customers: custCount, disb_actual: disbAct, disbursement: disbVal, 
+                        active_customers: acVal, new_customers: ncVal, otc: otcVal, dd7: dd7Val, 
+                        new_customer_otc: ncOtcVal, date_reported: safeDateReported, month: latestMonthCodeToQuery
+                    };
+                });
+
+                let payoutsMap = {};
+                try {
+                    const res = await fetch('/api/calculate/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ payloads })
+                    });
+                    const bulkData = await res.json();
+                    if (bulkData.success) payoutsMap = bulkData.payouts;
+                } catch (e) {
+                    console.error("Bulk calc failed", e);
+                }
+                
+                tbody.innerHTML = '';
+                const sortedData = data.sort((a, b) => a.name.localeCompare(b.name));
 
                 sortedData.forEach(staff => {
                     const tr = document.createElement('tr');
-                    
-                    // Ops Manager Fix: Display correct historical branch in lists
                     const activeProfile = getActiveProfile(staff, latestMonthCodeToQuery);
                     const displayBranch = activeProfile.isHistorical ? `${activeProfile.branch} (Prev)` : activeProfile.branch;
-                    
+                    const payoutVal = payoutsMap[staff.email] || 0;
+
+                    // DIRECT ROW CLICKS!
+                    tr.style.cursor = 'pointer';
+                    tr.onmouseover = () => tr.style.backgroundColor = 'rgba(16, 185, 129, 0.1)'; 
+                    tr.onmouseout = () => tr.style.backgroundColor = '';
+                    tr.onclick = () => impersonateStaff(staff.email);
+
+                    // NO MORE VIEW BUTTON. Exactly 5 columns.
                     tr.innerHTML = `
                         <td style="font-weight: 600;">${staff.name}</td>
                         <td>${displayBranch || '-'}</td>
                         <td>${staff.type || '-'}</td>
-                        <td>${staff.customers}</td>
-                        <td><button class="btn-view-staff" onclick="impersonateStaff('${staff.email}')">View Dashboard</button></td>
+                        <td>${staff.id || '-'}</td>
+                        <td style="font-weight: 700; color: #10b981;">${formatKES(payoutVal)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
-                document.getElementById('kpi-staff-list-container').style.display = 'block';
-                setTimeout(() => document.getElementById('kpi-staff-list-container').scrollIntoView({ behavior: 'smooth' }), 100);
-            };
 
+                const getExportName = () => {
+                    const monthLabelEl = document.querySelector('.kpi-month-label');
+                    const shortMonth = monthLabelEl ? monthLabelEl.textContent.replace(/[()]/g, '').split(' ')[0] : 'Current';
+                    const fullMonths = { "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April", "May": "May", "Jun": "June", "Jul": "July", "Aug": "August", "Sep": "September", "Oct": "October", "Nov": "November", "Dec": "December" };
+                    const safeTitle = title.replace('Staff: ', '');
+                    return `${fullMonths[shortMonth] || shortMonth} ${safeTitle} List`;
+                };
+
+                btnCsv.onclick = () => {
+                    dropdownBox.style.display = 'none';
+                    let csvContent = "Name,Branch,Role,Staff ID,Total Payout (KES)\n";
+                    sortedData.forEach(staff => {
+                        const activeProfile = getActiveProfile(staff, latestMonthCodeToQuery);
+                        const displayBranch = activeProfile.isHistorical ? `${activeProfile.branch} (Prev)` : activeProfile.branch;
+                        const payout = payoutsMap[staff.email] || 0;
+                        csvContent += `"${staff.name}","${displayBranch}","${staff.type}","${staff.id || ''}","${payout}"\n`;
+                    });
+
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `${getExportName()}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                };
+
+                btnSheets.onclick = async () => {
+                    dropdownBox.style.display = 'none';
+                    let tsvContent = "Name\tBranch\tRole\tStaff ID\tTotal Payout (KES)\n";
+                    sortedData.forEach(staff => {
+                        const activeProfile = getActiveProfile(staff, latestMonthCodeToQuery);
+                        const displayBranch = activeProfile.isHistorical ? `${activeProfile.branch} (Prev)` : activeProfile.branch;
+                        const payout = payoutsMap[staff.email] || 0;
+                        tsvContent += `${staff.name}\t${displayBranch}\t${staff.type}\t${staff.id || ''}\t${payout}\n`;
+                    });
+                    
+                    const origHTML = btnSheets.innerHTML;
+
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(tsvContent);
+                        } else {
+                            const textArea = document.createElement("textarea");
+                            textArea.value = tsvContent;
+                            textArea.style.position = "fixed";
+                            textArea.style.left = "-9999px";
+                            document.body.appendChild(textArea);
+                            textArea.focus();
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                        }
+
+                        btnSheets.innerHTML = '<span style="color:#10b981; font-weight:700;">✓ Data Copied! Open Sheets & Press Ctrl+V</span>';
+                        setTimeout(() => { btnSheets.innerHTML = origHTML; }, 4000);
+                    } catch (err) {
+                        alert("Failed to copy data. Your browser may be blocking it.");
+                    }
+                };
+
+                setTimeout(() => document.getElementById('kpi-staff-list-container').scrollIntoView({ behavior: 'smooth' }), 100);
+            }
+
+            // Click Handlers for KPI Cards (Runs ONLY ONCE)
             ['kpi-card-full', 'kpi-card-partial', 'kpi-card-missed'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
@@ -437,15 +676,8 @@
                 }
             });
 
-            const closeBtn = document.getElementById('close-kpi-list-btn');
-            if (closeBtn) {
-                closeBtn.onclick = () => {
-                    document.getElementById('kpi-staff-list-container').style.display = 'none';
-                    document.querySelectorAll('.kpi-card').forEach(c => {
-                        c.style.border = '1px solid var(--border-color)';
-                    });
-                };
-            }
+            // Ensure close button is gone
+            document.getElementById('close-kpi-list-btn')?.remove();
 
             if (window.opsBonusChartInstance) window.opsBonusChartInstance.destroy();
             if (window.opsBandChartInstance) window.opsBandChartInstance.destroy();
@@ -473,15 +705,16 @@
                 }
             });
 
+            // Highly distinct, vivid colors for clear visual separation
             window.opsBandChartInstance = new Chart(ctxBand, {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Elite (>500)', data: eliteBandData, borderColor: '#8b5cf6', backgroundColor: '#8b5cf6', tension: 0.3, borderWidth: 2 },
-                        { label: 'Growth/Tension (351-500)', data: growthBandData, borderColor: '#3b82f6', backgroundColor: '#3b82f6', tension: 0.3, borderWidth: 2 },
-                        { label: 'Baseline (201-350)', data: baselineBandData, borderColor: '#0ea5e9', backgroundColor: '#0ea5e9', tension: 0.3, borderWidth: 2 },
-                        { label: 'Floor (<=200)', data: floorBandData, borderColor: '#64748b', backgroundColor: '#64748b', tension: 0.3, borderWidth: 2 }
+                        { label: 'Elite (>500)', data: eliteBandData, borderColor: '#9333ea', backgroundColor: '#9333ea', tension: 0.3, borderWidth: 2 }, 
+                        { label: 'Growth/Tension (351-500)', data: growthBandData, borderColor: '#10b981', backgroundColor: '#10b981', tension: 0.3, borderWidth: 2 }, 
+                        { label: 'Baseline (201-350)', data: baselineBandData, borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3, borderWidth: 2 }, 
+                        { label: 'Floor (<=200)', data: floorBandData, borderColor: '#ef4444', backgroundColor: '#ef4444', tension: 0.3, borderWidth: 2 } 
                     ]
                 },
                 options: {
@@ -586,7 +819,18 @@
             };
 
             const updateRowUI = (key, diffId, statusId) => {
-                const diff = currentMetrics[key] - TARGETS[key];
+                let diff = currentMetrics[key] - TARGETS[key];
+                let isMet = currentMetrics[key] >= TARGETS[key];
+
+                // WAIVE SPECIFICALLY NEW CUSTOMER OTC FOR JULY 2026 AND EARLIER
+                if (key === 'new_customer_otc' && selectedMonth <= '202607') {
+                    const statusEl = document.getElementById(statusId);
+                    if (statusEl) statusEl.innerHTML = `<span class="status-badge met" style="background: #3b82f6;">✓ Waived</span>`;
+                    const diffEl = document.getElementById(diffId);
+                    if (diffEl) { diffEl.textContent = 'N/A'; diffEl.className = 'diff-val'; }
+                    return;
+                }
+
                 const diffEl = document.getElementById(diffId);
                 if (diffEl) {
                     diffEl.textContent = `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
@@ -594,7 +838,7 @@
                 }
                 const statusEl = document.getElementById(statusId);
                 if (statusEl) {
-                    statusEl.innerHTML = currentMetrics[key] >= TARGETS[key] 
+                    statusEl.innerHTML = isMet 
                         ? `<span class="status-badge met">✓ Met</span>` 
                         : `<span class="status-badge missed">✕ Not Met</span>`;
                 }
@@ -928,24 +1172,27 @@
                         .then(res => res.json())
                         .then(data => {
                             if (data && data.success) {
-                                if (data.all_staff) {
-                                    allStaffData = data.all_staff;
-                                    filteredStaff = allStaffData;
-                                }
-                                if (data.raw_performance) rawPerformance = data.raw_performance;
-                                
-                                renderOpsStaffTable();
-                                renderOpsAnalytics(rawPerformance);
+                                // 🛑 FREEZE FIX: Pause for 50ms so the screen can draw!
+                                setTimeout(() => {
+                                    if (data.all_staff) {
+                                        allStaffData = data.all_staff;
+                                        filteredStaff = allStaffData;
+                                    }
+                                    if (data.raw_performance) rawPerformance = data.raw_performance;
+                                    
+                                    renderOpsStaffTable();
+                                    renderOpsAnalytics(rawPerformance);
 
-                                const skelStaff = document.getElementById('skeleton-staff-tbody');
-                                const dataStaff = document.getElementById('ops-staff-tbody');
-                                if (skelStaff) skelStaff.style.display = 'none';
-                                if (dataStaff) dataStaff.style.display = 'table-row-group';
+                                    const skelStaff = document.getElementById('skeleton-staff-tbody');
+                                    const dataStaff = document.getElementById('ops-staff-tbody');
+                                    if (skelStaff) skelStaff.style.display = 'none';
+                                    if (dataStaff) dataStaff.style.display = 'table-row-group';
 
-                                const skelAnalytics = document.getElementById('ops-analytics-skeleton');
-                                const dataAnalytics = document.getElementById('ops-analytics-content');
-                                if (skelAnalytics) skelAnalytics.style.display = 'none';
-                                if (dataAnalytics) dataAnalytics.style.display = 'block';
+                                    const skelAnalytics = document.getElementById('ops-analytics-skeleton');
+                                    const dataAnalytics = document.getElementById('ops-analytics-content');
+                                    if (skelAnalytics) skelAnalytics.style.display = 'none';
+                                    if (dataAnalytics) dataAnalytics.style.display = 'block';
+                                }, 50); // <-- 50ms breathing room
                             }
                         })
                         .catch(err => console.error("Error fetching ops data:", err));
@@ -981,12 +1228,11 @@ window.renderGoogleButton = function() {
         type: "standard", 
         shape: "rectangular", 
         theme: currentTheme === 'dark' ? "filled_black" : "outline", 
-        text: "continue_with", 
+        text: "signin_with",  // Changes text to "Sign in with Google"
         size: "large", 
         logo_alignment: "left" 
     });
     
-    google.accounts.id.prompt();
 };
 
 window.addEventListener('load', () => setTimeout(window.renderGoogleButton, 300));

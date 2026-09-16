@@ -302,5 +302,36 @@ def logout():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/calculate/bulk', methods=['POST'])
+def calculate_bulk():
+    if not app.config.get('BONUS_CONFIG'):
+        app.config['BONUS_CONFIG'] = get_cached_config(app.config.get('SHEET_ID'))
+        if not app.config.get('BONUS_CONFIG'):
+            return jsonify({"success": False, "error": "Configuration not loaded."}), 500
+    
+    config = app.config['BONUS_CONFIG']
+    data = request.json
+    payloads = data.get('payloads', [])
+    
+    results = {}
+    for req in payloads:
+        try:
+            email = req.get('email')
+            salary = float(req.get('salary', 0))
+            
+            # Run the engine for each staff member in the list
+            raw_result = calculate_bonus(req, config)
+            safe_result = sanitize_floats(raw_result)
+            
+            base_bonus = safe_result.get('current', {}).get('base_bonus', 0)
+            upside = safe_result.get('collection', {}).get('upside', 0)
+            
+            # Combine the total payout
+            results[email] = salary + base_bonus + upside
+        except Exception as e:
+            results[req.get('email', 'unknown')] = 0
+            
+    return jsonify({"success": True, "payouts": results})
+
 if __name__ == '__main__':
     app.run(debug=True)
