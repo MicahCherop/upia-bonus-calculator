@@ -82,14 +82,15 @@ window.renderGoogleButton = function() {
     google.accounts.id.initialize({
         client_id: "85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com",
         callback: window.handleGoogleLogin,
-        auto_select: false
+        auto_select: false,
+        itp_support: true
     });
 
     google.accounts.id.renderButton(container, { 
         type: "standard", 
         shape: "rectangular", 
         theme: currentTheme === 'dark' ? "filled_black" : "outline", 
-        text: "signin_with", // FIXED: Forces clean "Sign in with Google" text
+        text: "signin_with", 
         size: "large", 
         logo_alignment: "left" 
     });
