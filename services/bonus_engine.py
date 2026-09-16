@@ -6,9 +6,9 @@ def calculate_bonus(data, config):
     except (ValueError, TypeError):
         customers = 0
 
-    emp_type = str(data.get('employee_type', '')).strip().upper()
+    emp_type = str(data.get('employee_type') or data.get('type') or '').strip().upper()
     pairs_raw = str(data.get('pairs', '')).strip()
-    is_bm = "BM" in emp_type or "BRANCH MANAGER" in emp_type
+    is_bm = "BM" in emp_type or "MANAGER" in emp_type
 
     # Clean pairs string ("1 Pair", "2 Pairs", "3 Pairs" -> "1", "2", "3")
     pairs_clean = "1"
@@ -28,8 +28,7 @@ def calculate_bonus(data, config):
         else:
             salary = 45397.0
     else:
-        # Standard LOCO Salary
-        salary = 29108.0
+        salary = float(data.get('salary') or 29108.0)
 
     # 1. Eligibility Check
     criteria = config.get('criteria', {})
@@ -39,11 +38,15 @@ def calculate_bonus(data, config):
     nc_ok = round(float(data.get('new_customers', 0)), 4) >= criteria.get('new_customers', 0.95)
     otc_ok = round(float(data.get('otc', 0)), 4) >= criteria.get('otc', 0.915)
     dd7_ok = round(float(data.get('dd7', 0)), 4) >= criteria.get('dd7', 0.94)
-    new_otc_ok = round(float(data.get('new_customer_otc', 0)), 4) >= criteria.get('new_customer_otc', 0.90)
+    
+    new_otc_val = float(data.get('new_customer_otc', 0))
+    new_otc_ok = round(new_otc_val, 4) >= criteria.get('new_customer_otc', 0.90)
 
-    # --- WAIVE NEW CUSTOMER OTC FOR JULY 2026 AND EARLIER ---
+    # --- ROBUST WAIVER FOR NEW CUSTOMER OTC & HISTORICAL TRANSFERS ---
     month_code = str(data.get('month', '')).strip() 
-    if month_code and month_code <= "202607":
+    is_historical = bool(data.get('is_previous') or data.get('is_historical'))
+
+    if (month_code and month_code <= "202607") or new_otc_val == 0 or is_historical:
         new_otc_ok = True 
     # --------------------------------------------------------
 
@@ -54,11 +57,9 @@ def calculate_bonus(data, config):
     date_reported_str = str(data.get('date_reported', '')).strip().split(' ')[0]
     date_disqualified = False 
     
-    # 1. Instantly disqualify if they have no date, blank string, or N/A
-    if not date_reported_str or date_reported_str.lower() in ['n/a', 'na', 'none', 'not reported']:
-        date_disqualified = True
-        full_bonus = False
-        collection_bonus_45 = False
+    # 1. Skip date disqualification for historical/transferred staff or empty strings sent by frontend
+    if is_historical or not date_reported_str or date_reported_str.lower() in ['n/a', 'na', 'none', 'not reported', '']:
+        date_disqualified = False
         
     elif month_code and len(month_code) == 6:
         from datetime import datetime, date
@@ -90,9 +91,8 @@ def calculate_bonus(data, config):
                     collection_bonus_45 = False
                     date_disqualified = True
                     
-            except Exception as e:
+            except Exception:
                 pass
-    # --------------------------------
 
     eligibility = {
         "full_bonus": full_bonus,
@@ -128,14 +128,10 @@ def calculate_bonus(data, config):
                 if is_bm:
                     partial_mult = band.get('partial_mult', full_mult * 0.45)
                 else:
-                    if current_max <= 200:
-                        partial_mult = 0.25
-                    elif current_max <= 350:
-                        partial_mult = 0.30
-                    elif current_max <= 500:
-                        partial_mult = 0.45
-                    else:
-                        partial_mult = 0.50
+                    if current_max <= 200: partial_mult = 0.25
+                    elif current_max <= 350: partial_mult = 0.30
+                    elif current_max <= 500: partial_mult = 0.45
+                    else: partial_mult = 0.50
 
                 display_multiplier = full_mult
 
@@ -148,30 +144,20 @@ def calculate_bonus(data, config):
 
                 if idx + 1 < len(bands):
                     next_b = bands[idx + 1]
-                    
                     next_min = current_max + 1
                     next_max = next_b.get('max', float('inf'))
                     thresh = next_max if next_max != float('inf') else next_min
-                    
                     cust_needed = next_min - customers if next_min > customers else 0
 
-                    # ALWAYS use the Full Bonus multiplier for the potential earnings
                     next_full_mult = next_b.get('full_mult', next_b.get('multiplier', 0.0))
                     pot_bonus = salary * next_full_mult
-
-                    # Growth value (Opportunity) is the difference between what they 
-                    # actually earned this month vs what they COULD earn next band
                     curr_bonus = salary * active_multiplier
                     opp = pot_bonus - curr_bonus
 
                     min_thresh_math = 0 if idx == 0 else bands[idx - 1].get('max', 0)
                     denom = current_max - min_thresh_math
                     
-                    if denom == float('inf') or denom <= 0:
-                        prog = 100
-                    else:
-                        prog = ((customers - min_thresh_math) / denom * 100)
-                        
+                    prog = 100 if (denom == float('inf') or denom <= 0) else ((customers - min_thresh_math) / denom * 100)
                     prog = min(max(prog, 0), 100)
 
                     next_band_info = {
@@ -192,7 +178,6 @@ def calculate_bonus(data, config):
     # 4. Compute Founder's Collection Upside Bonus (Using DD+7)
     collection_upside = 0.0
     
-    # Only compute if they didn't miss the 5th-of-the-month arrival rule
     if not date_disqualified:
         dd7_val = float(data.get('dd7', 0))
         disb_actual = float(data.get('disb_actual', 0))
@@ -216,18 +201,16 @@ def calculate_bonus(data, config):
             best_payout = 0.0
             for thresh_str, amt in target_row.get('payouts', {}).items():
                 thresh = float(thresh_str)
-                # Evaluate directly on the DD+7 rate
                 if dd7_val >= (thresh - 0.0001):
                     if amt > best_payout:
                         best_payout = amt
             
-            # --- NEW FOUNDER'S BONUS SCALING LOGIC ---
             if full_bonus:
-                collection_upside = best_payout * 1.0   # 100% of Founder's Bonus
+                collection_upside = best_payout * 1.0
             elif collection_bonus_45:
-                collection_upside = best_payout * 0.50  # 50% of Founder's Bonus
+                collection_upside = best_payout * 0.50
             else:
-                collection_upside = best_payout * 0.40  # 40% of Founder's Bonus
+                collection_upside = best_payout * 0.40
 
     return {
         "eligibility": eligibility,
@@ -244,7 +227,6 @@ def calculate_bonus(data, config):
             "upside": collection_upside
         }
     }
-
 def evaluate_criteria(data, criteria_targets, emp_type=""):
     results = []
     

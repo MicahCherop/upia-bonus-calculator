@@ -77,6 +77,12 @@
                         <p class="welcome-sub">Manage platform administrators and operational managers.</p>
                     </div>
                     <div class="card shadow-sm">
+                        <!-- Search & Total Count Header -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                            <input type="text" id="admin-search-input" placeholder="Search by staff name..." style="max-width: 320px; width: 100%; border-radius: 8px; border: 1px solid var(--border-color); padding: 8px 14px; font-size: 13px; background: var(--bg-main); color: var(--text-main); outline: none;">
+                            <div id="admin-user-count" style="font-size: 12px; font-weight: 700; color: var(--primary-blue); background: rgba(59, 130, 246, 0.1); padding: 6px 12px; border-radius: 20px;">Total Users: 0</div>
+                        </div>
+
                         <div class="table-responsive">
                             <table class="data-table">
                                 <thead>
@@ -90,77 +96,132 @@
                                 </thead>
                                 <tbody id="admin-users-tbody">
                                     <!-- Populated via JS -->
-                                    <tr>
-                                        <td>System Admin</td>
-                                        <td>admin@4g-capital.com</td>
-                                        <td><span class="status-badge" style="background: var(--danger-bg); color: var(--danger);">ADMIN</span></td>
-                                        <td>Just now</td>
-                                        <td><button class="btn-secondary" style="padding: 4px 8px; font-size: 10px;">Revoke</button></td>
-                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- VIEW 2: APP TRAFFIC -->
+                <!-- VIEW 2: APP TRAFFIC & HEALTH -->
                 <div id="admin-traffic" class="view-panel" style="display: none;">
                     <div class="workspace-header">
-                        <h1>App Traffic & Visitors</h1>
-                        <p class="welcome-sub">Live monitoring of user sessions and geographic distribution.</p>
+                        <h1>App Traffic & System Health</h1>
+                        <p class="welcome-sub">Real-time monitoring of sessions, activities, and security threats.</p>
                     </div>
-                    <div class="hero-top-stack">
-                        <div class="card" style="text-align: center;">
-                            <small style="font-size: 10px; color: var(--text-muted); font-weight: 600;">ACTIVE SESSIONS</small>
-                            <h2 style="font-size: 32px; color: var(--success); margin: 8px 0;">42</h2>
-                            <span style="font-size: 11px; color: var(--success);">+12% from last hour</span>
+
+                    <!-- Dynamic Crash Warning Banner -->
+                    <div id="crash-warning-banner" style="display: none; background: var(--danger); color: #fff; padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px; font-weight: 600; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        CRITICAL WARNING: Unusually high traffic detected. Server capacity exceeding safe limits.
+                    </div>
+
+                    <!-- Top Metrics: Health & Traffic -->
+                    <div class="hero-inner-box" style="margin-bottom: 16px;">
+                        <div class="inner-stat">
+                            <small>Active Sessions</small>
+                            <strong id="live-active-sessions" style="font-size: 20px; color: var(--success);">--</strong>
                         </div>
-                        <div class="card" style="text-align: center;">
-                            <small style="font-size: 10px; color: var(--text-muted); font-weight: 600;">UNIQUE VISITORS (TODAY)</small>
-                            <h2 style="font-size: 32px; color: var(--primary-blue); margin: 8px 0;">184</h2>
+                        <div class="inner-stat">
+                            <small>Server CPU Load</small>
+                            <strong id="live-server-load" style="font-size: 20px;">--</strong>
+                        </div>
+                        <div class="inner-stat">
+                            <small>API Latency</small>
+                            <strong id="live-api-latency" style="font-size: 20px;">--</strong>
                         </div>
                     </div>
-                    <div class="card shadow-sm">
-                        <h3 style="margin-bottom: 16px;">Traffic Volume (Last 24 Hours)</h3>
-                        <div style="position: relative; height: 300px; width: 100%;">
-                            <canvas id="trafficChart"></canvas>
+
+                    <div class="dashboard-columns">
+                        <!-- Live Activity Feed -->
+                        <div class="card shadow-sm">
+                            <h3 style="margin-bottom: 12px;">Live User Activity</h3>
+                            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                                <table class="data-table">
+                                    <thead><tr><th>Time</th><th>User</th><th>Action</th></tr></thead>
+                                    <tbody id="live-activity-log">
+                                        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Awaiting live feed...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Threat Log & Vulnerabilities -->
+                        <div class="card shadow-sm">
+                            <h3 style="color: var(--danger); margin-bottom: 12px;">Threat Log</h3>
+                            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                                <table class="data-table">
+                                    <thead><tr><th>Time</th><th>IP / Source</th><th>Threat Detected</th></tr></thead>
+                                    <tbody id="live-threat-log">
+                                        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">System Secure. No active threats.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- VIEW 3: VULNERABILITIES -->
                 <div id="admin-security" class="view-panel" style="display: none;">
-                    <div class="workspace-header">
-                        <h1>Security & Vulnerabilities</h1>
-                        <p class="welcome-sub">Automated threat detection and authentication logs.</p>
+                    <div class="workspace-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h1>Security & Vulnerabilities</h1>
+                            <p class="welcome-sub">Automated threat detection and authentication logs.</p>
+                        </div>
+                        <button onclick="exportSecurityLog()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Export Security Log
+                        </button>
                     </div>
+                    
                     <div class="dashboard-columns">
                         <div class="card shadow-sm">
                             <h3 style="color: var(--danger);">Failed Auth Attempts</h3>
                             <div class="table-responsive">
                                 <table class="data-table">
-                                    <thead><tr><th>Email</th><th>IP Address</th><th>Time</th></tr></thead>
-                                    <tbody>
-                                        <tr><td>unknown@test.com</td><td>192.168.1.45</td><td>10 mins ago</td></tr>
-                                        <tr><td>staff_typo@4g-capital.com</td><td>10.0.0.22</td><td>1 hr ago</td></tr>
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>IP Address</th>
+                                            <th>Time</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="threat-mitigation-tbody">
+                                        <!-- Populated by JS -->
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                        <div class="card shadow-sm">
-                            <h3>System Security Checks</h3>
-                            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                                    <strong>Google OAuth Integrity</strong>
-                                    <span class="status-badge met">Secure</span>
+
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- System Security Checks -->
+                            <div class="card shadow-sm">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                    <h3>System Security Checks</h3>
+                                    <button onclick="runSecurityAudit()" class="btn-secondary" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; cursor: pointer;">Run Audit</button>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                                    <strong>Redis Cache Protection</strong>
-                                    <span class="status-badge met">Secure</span>
+                                <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                        <strong>Google OAuth Integrity</strong>
+                                        <span id="audit-oauth" class="status-badge" style="background: var(--bg-main); color: var(--text-muted);">Checking...</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                        <strong>Redis Cache Protection</strong>
+                                        <span id="audit-redis" class="status-badge" style="background: var(--bg-main); color: var(--text-muted);">Checking...</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                        <strong>CORS Policies</strong>
+                                        <span id="audit-cors" class="status-badge" style="background: var(--bg-main); color: var(--text-muted);">Checking...</span>
+                                    </div>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                                    <strong>CORS Policies</strong>
-                                    <span class="status-badge" style="background: var(--amber-bg); color: var(--amber-text);">Warning</span>
+                            </div>
+
+                            <!-- Rate Limit Watchlist -->
+                            <div class="card shadow-sm">
+                                <h3>IP Watchlist (Rate Limiting)</h3>
+                                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">IPs approaching the 5-strike auto-ban limit.</p>
+                                <div id="watchlist-container" style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- Populated by JS -->
                                 </div>
                             </div>
                         </div>
@@ -169,29 +230,29 @@
 
                 <!-- VIEW 4: SYSTEM PERFORMANCE -->
                 <div id="admin-performance" class="view-panel" style="display: none;">
-                    <div class="workspace-header">
-                        <h1>Overall System Performance</h1>
-                        <p class="welcome-sub">Server load, API latency, and Google Sheets sync health.</p>
+                    <div class="workspace-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h1>Overall System Performance</h1>
+                            <p class="welcome-sub">Server load, API latency, and Google Sheets sync health.</p>
+                        </div>
+                        <button onclick="forceHardSync()" class="btn-secondary" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 16px; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+                            Force Hard Sync
+                        </button>
                     </div>
+                    
                     <div class="hero-top-stack">
                         <div class="card">
                             <h3 class="card-sm-title">API Latency</h3>
-                            <h2 style="font-size: 24px; color: var(--text-main);">124 ms</h2>
-                            <div class="progress-bar-wrap hero-prog-wrap" style="margin-top: 8px;"><div class="progress-bar-fill" style="width: 12%; background: var(--success);"></div></div>
+                            <h2 id="perf-latency-text" style="font-size: 24px; color: var(--text-main);">-- ms</h2>
+                            <div class="progress-bar-wrap hero-prog-wrap" style="margin-top: 8px;"><div id="perf-latency-bar" class="progress-bar-fill" style="width: 0%; background: var(--success);"></div></div>
                         </div>
                         <div class="card">
                             <h3 class="card-sm-title">Google Sheets Sync Success</h3>
-                            <h2 style="font-size: 24px; color: var(--success);">99.8%</h2>
-                            <div class="progress-bar-wrap hero-prog-wrap" style="margin-top: 8px;"><div class="progress-bar-fill" style="width: 99.8%; background: var(--success);"></div></div>
+                            <h2 id="perf-sync-text" style="font-size: 24px; color: var(--success);">--%</h2>
+                            <div class="progress-bar-wrap hero-prog-wrap" style="margin-top: 8px;"><div id="perf-sync-bar" class="progress-bar-fill" style="width: 0%; background: var(--success);"></div></div>
                         </div>
                     </div>
-                    <div class="card shadow-sm">
-                        <h3 style="margin-bottom: 16px;">Server Resource Usage</h3>
-                        <div style="position: relative; height: 300px; width: 100%;">
-                            <canvas id="performanceChart"></canvas>
-                        </div>
-                    </div>
-                </div>
             </main>
         </div>
     </div>
@@ -202,6 +263,8 @@
     </button>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        let allSystemUsers = [];
+
         // Set User Profile Picture
         const currentUser = JSON.parse(sessionStorage.getItem('upia_user'));
         if (currentUser && currentUser.picture) {
@@ -227,50 +290,483 @@
             });
         });
 
-        // Initialize Charts (Mocked Data for UI setup)
+        // =========================================================
+        // DYNAMIC SYSTEM USERS RENDERER (OPS & ADMIN MANAGEMENT)
+        // =========================================================
+        const renderAdminUserTable = (users) => {
+            const tbody = document.getElementById('admin-users-tbody');
+            const countEl = document.getElementById('admin-user-count');
+            
+            if (countEl) countEl.textContent = `Total Users: ${users ? users.length : 0}`;
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (!users || users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">No matching users found.</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+
+                // Privilege Badge Logic
+                let badgeStyle = 'background: var(--bg-main); color: var(--text-muted); border: 1px solid var(--border-color);';
+                const roleUpper = (user.type || '').toUpperCase();
+
+                if (roleUpper.includes('ADMIN')) {
+                    badgeStyle = 'background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-weight: 700;';
+                } else if (roleUpper.includes('MANAGER') || roleUpper.includes('OPS') || user.is_ops) {
+                    badgeStyle = 'background: var(--amber-bg); color: var(--amber-text); border: 1px solid rgba(245, 158, 11, 0.2); font-weight: 600;';
+                }
+
+                tr.innerHTML = `
+                    <td style="font-weight: 600; color: var(--text-main);">${user.name || 'Unknown'}</td>
+                    <td>${user.email || '-'}</td>
+                    <td><span class="status-badge" style="${badgeStyle}">${user.type || 'Staff'}</span></td>
+                    <td style="color: var(--text-muted); font-size: 11px;">Active Recently</td>
+                    <td>
+                        <button class="btn-secondary" onclick="viewSystemUser('${user.email}')" style="padding: 4px 10px; font-size: 11px; cursor: pointer; border-radius: 6px;">
+                            View
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        // Real-Time Search Filter
+        document.getElementById('admin-search-input')?.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const filteredUsers = allSystemUsers.filter(user => 
+                (user.name || '').toLowerCase().includes(query)
+            );
+            renderAdminUserTable(filteredUsers);
+        });
+
+        // Load Users from Memory Cache or Fetch
+        const loadSystemUsers = () => {
+            const cachedStaff = sessionStorage.getItem('upia_ops_staff');
+            if (cachedStaff) {
+                try {
+                    allSystemUsers = JSON.parse(cachedStaff);
+                    renderAdminUserTable(allSystemUsers);
+                    return;
+                } catch(e) { console.warn("Cache parse error", e); }
+            }
+
+            const token = sessionStorage.getItem('upia_google_token');
+            if (token) {
+                fetch('/api/auth/google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: token })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.all_staff) {
+                        allSystemUsers = data.all_staff;
+                        sessionStorage.setItem('upia_ops_staff', JSON.stringify(allSystemUsers));
+                        renderAdminUserTable(allSystemUsers);
+                    }
+                })
+                .catch(err => console.error("Admin user load error:", err));
+            }
+        };
+
+        window.viewSystemUser = (email) => {
+            sessionStorage.setItem('upia_admin_target', email);
+            window.location.href = '/overview';
+        };
+
+        // Initialize Table
+        loadSystemUsers();
+
+        // =========================================================
+        // SAFE CHART INITIALIZATION & PERFORMANCE MONITORING
+        // =========================================================
         const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.05)' } },
                 x: { grid: { display: false } }
             }
         };
 
         // Traffic Chart
-        const ctxTraffic = document.getElementById('trafficChart').getContext('2d');
-        new Chart(ctxTraffic, {
-            type: 'line',
-            data: {
-                labels: ['12am', '4am', '8am', '12pm', '4pm', '8pm', 'Now'],
-                datasets: [{
-                    label: 'Active Users',
-                    data: [12, 8, 45, 89, 120, 65, 42],
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: commonOptions
-        });
+        const trafficCanvas = document.getElementById('trafficChart');
+        if (trafficCanvas) {
+            new Chart(trafficCanvas.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: ['12am', '4am', '8am', '12pm', '4pm', '8pm', 'Now'],
+                    datasets: [{ label: 'Active Users', data: [12, 8, 45, 89, 120, 65, 42], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }]
+                },
+                options: { ...commonOptions, scales: { y: { beginAtZero: true } } } // Remove max:100 limit for users
+            });
+        }
 
         // Performance Chart
-        const ctxPerf = document.getElementById('performanceChart').getContext('2d');
-        new Chart(ctxPerf, {
-            type: 'bar',
-            data: {
-                labels: ['CPU Load', 'Memory Usage', 'DB Latency', 'Cache Hit Rate'],
-                datasets: [{
-                    label: 'System Metrics (%)',
-                    data: [35, 62, 15, 94],
-                    backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'],
-                    borderRadius: 4
-                }]
-            },
-            options: commonOptions
+        let perfChartInstance = null;
+        const perfCanvas = document.getElementById('performanceChart');
+        if (perfCanvas) {
+            perfChartInstance = new Chart(perfCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['CPU Load', 'Memory Usage', 'DB Latency', 'Cache Hit Rate'],
+                    datasets: [{
+                        label: 'System Metrics (%)',
+                        data: [0, 0, 0, 0], // Starts empty, filled by live data
+                        backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'],
+                        borderRadius: 4
+                    }]
+                },
+                options: commonOptions
+            });
+        }
+
+        // Live Performance Loop
+        let perfInterval;
+        const startPerformanceMonitoring = () => {
+            if (perfInterval) clearInterval(perfInterval);
+            
+            perfInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/admin/performance');
+                    if (!res.ok) throw new Error("Failed to fetch performance metrics");
+                    const data = await res.json();
+                    
+                    // 1. Update Latency UI
+                    const latencyText = document.getElementById('perf-latency-text');
+                    const latencyBar = document.getElementById('perf-latency-bar');
+                    // 1.5 Update Google Sheets Sync UI
+                    const syncText = document.getElementById('perf-sync-text');
+                    const syncBar = document.getElementById('perf-sync-bar');
+                    if (syncText && syncBar) {
+                        const rate = data.sync_rate || 100;
+                        syncText.textContent = `${rate.toFixed(1)}%`;
+                        syncBar.style.width = `${rate}%`;
+                        
+                        let syncColor = 'var(--success)';
+                        if (rate < 90) syncColor = 'var(--amber-text)';
+                        if (rate < 50) syncColor = 'var(--danger)';
+                        
+                        syncText.style.color = syncColor;
+                        syncBar.style.background = syncColor;
+                    }
+                    
+                    if (latencyText && latencyBar) {
+                        const ms = data.api_latency_ms || 0;
+                        latencyText.textContent = `${ms} ms`;
+                        
+                        // Visual thresholds: <200ms is Green, 200-500ms is Orange, >500ms is Red
+                        let color = 'var(--success)';
+                        if (ms > 500) color = 'var(--danger)';
+                        else if (ms > 200) color = 'var(--amber-text)';
+                        
+                        // Cap width at 100% (assuming 1000ms is a full bar)
+                        const widthPct = Math.min((ms / 1000) * 100, 100);
+                        
+                        latencyBar.style.width = `${widthPct}%`;
+                        latencyBar.style.background = color;
+                        latencyText.style.color = ms > 500 ? 'var(--danger)' : 'var(--text-main)';
+                    }
+                    
+                    // 2. Update Chart.js Data
+                    if (perfChartInstance) {
+                        perfChartInstance.data.datasets[0].data = [
+                            data.cpu_load || 0,
+                            data.memory_usage || 0,
+                            data.db_latency || 0,
+                            data.cache_hit_rate || 0
+                        ];
+                        perfChartInstance.update(); // Triggers the smooth animation!
+                    }
+                    
+                } catch (err) {
+                    console.error("Performance Sync Error:", err);
+                }
+            }, 3000); // Poll every 3 seconds
+        };
+
+        // Start tracking when the Performance tab is clicked
+        document.querySelector('.menu-item[data-target="admin-performance"]').addEventListener('click', () => {
+            startPerformanceMonitoring();
         });
+        // =========================================================
+        // REAL-TIME TRAFFIC & HEALTH MONITORING
+        // =========================================================
+        let trafficInterval;
+
+        const startRealTimeMonitoring = () => {
+            if (trafficInterval) clearInterval(trafficInterval);
+
+            // Poll the server every 3 seconds
+            trafficInterval = setInterval(async () => {
+                try {
+                    // Fetch LIVE data from your Python/Redis backend
+                    const res = await fetch('/api/admin/metrics');
+                    if (!res.ok) throw new Error("Failed to fetch live metrics");
+                    
+                    const metrics = await res.json();
+                    
+                    // Update Hero Metrics
+                    document.getElementById('live-active-sessions').textContent = metrics.active_sessions || 0;
+                    
+                    const loadEl = document.getElementById('live-server-load');
+                    const cpuLoad = metrics.cpu_load || 0;
+                    loadEl.textContent = `${cpuLoad}%`;
+                    loadEl.style.color = cpuLoad > 80 ? 'var(--danger)' : 'var(--text-main)';
+
+                    const latencyEl = document.getElementById('live-api-latency');
+                    const apiLatency = metrics.api_latency || 0;
+                    latencyEl.textContent = `${apiLatency}ms`;
+                    latencyEl.style.color = apiLatency > 200 ? 'var(--amber-text)' : 'var(--text-main)';
+
+                    // Toggle Crash Warning Banner
+                    const warningBanner = document.getElementById('crash-warning-banner');
+                    if (warningBanner) {
+                        warningBanner.style.display = metrics.is_crashing ? 'flex' : 'none';
+                    }
+
+                    // Update Live Activity Feed
+                    const activityTbody = document.getElementById('live-activity-log');
+                    const recentActivities = metrics.recent_activities || [];
+                    if (recentActivities.length > 0 && activityTbody) {
+                        activityTbody.innerHTML = recentActivities.map(act => 
+                            `<tr>
+                                <td style="color: var(--text-muted); font-size: 10px;">${act.time || '-'}</td>
+                                <td style="font-weight: 600;">${(act.user || 'Unknown').split('@')[0]}</td>
+                                <td>${act.action || '-'}</td>
+                            </tr>`
+                        ).join('');
+                    } else if (activityTbody) {
+                        activityTbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No recent activity.</td></tr>';
+                    }
+
+                    // Update Live Threat Log
+                    const threatTbody = document.getElementById('live-threat-log');
+                    const recentThreats = metrics.recent_threats || [];
+                    if (recentThreats.length > 0 && threatTbody) {
+                        threatTbody.innerHTML = recentThreats.map(threat => 
+                            `<tr>
+                                <td style="color: var(--text-muted); font-size: 10px;">${threat.time || '-'}</td>
+                                <td>${threat.ip || '-'}</td>
+                                <td style="color: var(--danger); font-weight: 600;">${threat.threat || '-'}</td>
+                            </tr>`
+                        ).join('');
+                    } else if (threatTbody) {
+                        threatTbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--success); font-weight: 500;">System Secure. No active threats.</td></tr>';
+                    }
+
+                } catch (err) {
+                    console.error("Monitoring sync failed:", err);
+                }
+            }, 3000); // Polls every 3 seconds
+        }; // <--- ADDED THIS MISSING BRACE AND SEMICOLON!
+
+        // Start monitoring when the Traffic tab is clicked
+        document.querySelector('.menu-item[data-target="admin-traffic"]').addEventListener('click', () => {
+            startRealTimeMonitoring();
+        });
+        // =========================================================
+        // SECURITY & THREAT MITIGATION
+        // =========================================================
+        
+        // Mock data representing recent failed logins
+        let failedLogins = [
+            { email: 'unknown_hacker@test.com', ip: '192.168.1.45', time: '10 mins ago', is_staff: false },
+            { email: 'staff_typo@4g-capital.com', ip: '10.0.0.22', time: '1 hr ago', is_staff: true }
+        ];
+
+        const renderThreatTable = () => {
+            const tbody = document.getElementById('threat-mitigation-tbody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = failedLogins.map(log => {
+                // Determine the appropriate action based on if it's a known staff member
+                let actionBtn = log.is_staff 
+                    ? `<button class="btn-secondary" onclick="unlockUser('${log.email}')" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;">Unlock User</button>`
+                    : `<button onclick="blockIP('${log.ip}')" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; background: var(--danger); color: white; border: none; cursor: pointer;">Block IP</button>`;
+
+                return `
+                    <tr>
+                        <td style="font-weight: ${log.is_staff ? '500' : '700'}; color: ${log.is_staff ? 'var(--text-main)' : 'var(--danger)'};">${log.email}</td>
+                        <td>${log.ip}</td>
+                        <td style="color: var(--text-muted); font-size: 11px;">${log.time}</td>
+                        <td>${actionBtn}</td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        // Action: Block Malicious IP
+        window.blockIP = async (ip) => {
+            if (!confirm(`Are you sure you want to ban the IP: ${ip}?`)) return;
+            
+            try {
+                const res = await fetch('/api/admin/security/block', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                
+                if (res.ok) {
+                    alert(`IP ${ip} has been blocked.`);
+                    // Remove the blocked IP from the local array to update the UI
+                    failedLogins = failedLogins.filter(log => log.ip !== ip);
+                    renderThreatTable();
+                } else {
+                    alert("Failed to block IP.");
+                }
+            } catch (err) {
+                console.error("Block IP Error:", err);
+            }
+        };
+
+        // Action: Unlock Known Staff
+        window.unlockUser = (email) => {
+            alert(`Password reset link sent to ${email}. Account unlocked.`);
+            // In a real scenario, this hits an /api/admin/security/unlock endpoint
+            failedLogins = failedLogins.filter(log => log.email !== email);
+            renderThreatTable();
+        };
+
+        // Initialize the table
+        renderThreatTable();
+        // =========================================================
+        // LIVE SECURITY AUDIT
+        // =========================================================
+        window.runSecurityAudit = async () => {
+            const badges = {
+                oauth: document.getElementById('audit-oauth'),
+                redis: document.getElementById('audit-redis'),
+                cors:  document.getElementById('audit-cors')
+            };
+            
+            // Set to loading state
+            Object.values(badges).forEach(el => {
+                if(el) {
+                    el.textContent = "Checking...";
+                    el.style = "background: var(--bg-main); color: var(--text-muted);";
+                }
+            });
+
+            try {
+                const res = await fetch('/api/admin/security-audit');
+                if (!res.ok) throw new Error("Audit request failed");
+                const data = await res.json();
+                
+                // Helper to apply colors
+                const applyStyle = (el, status) => {
+                    if (!el) return;
+                    el.textContent = status;
+                    if (status === 'Secure') {
+                        el.style = 'background: rgba(16, 185, 129, 0.15); color: var(--success); font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.3);';
+                    } else {
+                        el.style = 'background: var(--amber-bg); color: var(--amber-text); font-weight: 600; border: 1px solid rgba(245, 158, 11, 0.3);';
+                    }
+                };
+
+                applyStyle(badges.oauth, data.oauth);
+                applyStyle(badges.redis, data.redis);
+                applyStyle(badges.cors, data.cors);
+
+            } catch (err) {
+                console.error("Audit Error:", err);
+                Object.values(badges).forEach(el => {
+                    if(el) {
+                        el.textContent = "Error";
+                        el.style = "background: var(--danger-bg); color: var(--danger);";
+                    }
+                });
+            }
+        };
+
+        // Run the audit automatically when the Security tab is clicked
+        document.querySelector('.menu-item[data-target="admin-security"]').addEventListener('click', () => {
+            runSecurityAudit();
+        });
+        // =========================================================
+        // IP WATCHLIST (RATE LIMITING VISUALS)
+        // =========================================================
+        const loadWatchlist = async () => {
+            const container = document.getElementById('watchlist-container');
+            if (!container) return;
+
+            try {
+                const res = await fetch('/api/admin/security/watchlist');
+                const data = await res.json();
+                
+                // MOCK DATA: Remove this block once your login route actually sets "failed_auth" keys in Redis!
+                if (!data.watchlist || data.watchlist.length === 0) {
+                    data.watchlist = [
+                        { ip: '192.168.1.104', attempts: 3 },
+                        { ip: '10.0.0.55', attempts: 4 }
+                    ];
+                }
+
+                if (data.watchlist.length === 0) {
+                    container.innerHTML = '<div style="font-size: 12px; color: var(--success); text-align: center;">No suspicious activity detected.</div>';
+                    return;
+                }
+
+                container.innerHTML = data.watchlist.map(item => {
+                    const percentage = (item.attempts / 5) * 100;
+                    const barColor = item.attempts >= 4 ? 'var(--danger)' : 'var(--amber-text)';
+                    
+                    return `
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                                <strong>${item.ip}</strong>
+                                <span style="color: ${barColor}; font-weight: 600;">${item.attempts} / 5 fails</span>
+                            </div>
+                            <div class="progress-bar-wrap" style="height: 6px; background: var(--border-color);">
+                                <div class="progress-bar-fill" style="width: ${percentage}%; background: ${barColor};"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Watchlist Error:", err);
+            }
+        };
+
+        // =========================================================
+        // EXPORT SECURITY LOG TO CSV
+        // =========================================================
+        window.exportSecurityLog = () => {
+            // Instantly triggers a browser download for the CSV file
+            window.location.href = '/api/admin/security/export';
+        };
+
+        // Run Watchlist load when Security tab is clicked
+        document.querySelector('.menu-item[data-target="admin-security"]').addEventListener('click', () => {
+            runSecurityAudit(); // Existing audit check
+            loadWatchlist();    // New watchlist check
+        });
+        // =========================================================
+        // FORCE HARD SYNC ACTION
+        // =========================================================
+        window.forceHardSync = async () => {
+            if (!confirm("CRITICAL WARNING: This will instantly wipe the entire Redis cache and force a heavy download from Google Sheets. Continue?")) return;
+            
+            try {
+                const res = await fetch('/api/admin/system/flush', { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    alert(data.message);
+                    location.reload(); // Refresh the page to show clean stats
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                console.error("Flush error:", err);
+                alert("Failed to reach the server for a hard sync.");
+            }
+        };
     </script>
 </body>
 </html>

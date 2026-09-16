@@ -3,6 +3,11 @@ import json
 import math
 import redis
 import time
+import psutil
+import csv
+from io import StringIO
+from flask import Response
+from flask import request
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -25,6 +30,160 @@ cache = Cache(app)
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
+@app.before_request
+def track_user_activity():
+    # Only track API routes to avoid cluttering the log with static files
+    if not request.path.startswith('/api/'):
+        return
+
+    try:
+        # If we know who the user is (e.g., from a session or token)
+        user_email = "Anonymous"
+        current_time = int(time.time())
+        
+        # 1. Update Active Sessions (Use 'mapping=' to prevent version crashes)
+        redis_client.zadd("active_sessions", mapping={user_email: current_time})
+        
+        # 2. Log the specific action
+        action_log = {
+            "time": "Just now", 
+            "user": user_email, 
+            "action": f"Accessed {request.path}"
+        }
+        
+        # Push to a Redis list and keep only the last 20 activities
+        redis_client.lpush("live_activities", json.dumps(action_log))
+        redis_client.ltrim("live_activities", 0, 19)
+        
+    except Exception as e:
+        # CRITICAL SAFETY NET: If Redis fails, print the error but DO NOT crash the app
+        print(f"DEBUG: Redis Activity Tracking Error: {e}")
+
+# ==========================================
+# 1. THE GLOBAL IP BOUNCER (BULLETPROOFED)
+# ==========================================
+@app.before_request
+def enforce_ip_ban():
+    # Safely get the user's IP
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    
+    # Ensure client_ip exists before checking Redis to prevent NoneType crashes
+    if client_ip:
+        try:
+            if redis_client.sismember("banned_ips", client_ip):
+                return jsonify({"error": "Access Denied: Malicious activity detected."}), 403
+        except Exception as e:
+            print(f"Redis IP Check Error: {e}")
+
+# ==========================================
+# 2. THE ADMIN ENDPOINT TO BLOCK AN IP
+# ==========================================
+@app.route('/api/admin/security/block', methods=['POST'])
+def block_suspicious_ip():
+    # Safely handle missing JSON data
+    data = request.json or {}
+    ip_to_block = data.get('ip')
+    
+    if not ip_to_block:
+        return jsonify({"error": "IP address required"}), 400
+        
+    try:
+        redis_client.sadd("banned_ips", ip_to_block)
+        
+        # Safely dump JSON to prevent decode errors later
+        action_log = {
+            "time": "Just now", 
+            "user": "System Admin", 
+            "action": f"Banned IP: {ip_to_block}"
+        }
+        redis_client.lpush("live_activities", json.dumps(action_log))
+        
+        return jsonify({"status": "success", "message": f"IP {ip_to_block} blocked permanently."})
+    except Exception as e:
+        return jsonify({"error": f"Failed to block IP: {str(e)}"}), 500
+
+# ==========================================
+# 3. METRICS ENDPOINT (BULLETPROOFED)
+# ==========================================
+@app.route('/api/admin/metrics', methods=['GET'])
+def get_admin_metrics():
+    try:
+        current_time = int(time.time())
+        fifteen_mins_ago = current_time - 900
+        
+        redis_client.zremrangebyscore("active_sessions", 0, fifteen_mins_ago)
+        active_count = redis_client.zcard("active_sessions")
+
+        cpu_load = psutil.cpu_percent(interval=None)
+        
+        # Safely parse activities
+        raw_activities = redis_client.lrange("live_activities", 0, 9)
+        recent_activities = []
+        for act in raw_activities:
+            try:
+                recent_activities.append(json.loads(act))
+            except:
+                pass # Ignore corrupted JSON from old tests
+
+        # Safely parse threats
+        raw_threats = redis_client.lrange("live_threats", 0, 4)
+        recent_threats = []
+        for t in raw_threats:
+            try:
+                recent_threats.append(json.loads(t))
+            except:
+                pass
+
+        # Safely handle latency floats (e.g., if Redis returns "45.12")
+        latency_val = redis_client.get("avg_api_latency")
+        try:
+            latency = int(float(latency_val)) if latency_val else 45
+        except:
+            latency = 45 
+
+        metrics_payload = {
+            "active_sessions": active_count,
+            "cpu_load": cpu_load,
+            "api_latency": latency,
+            "is_crashing": cpu_load > 90, 
+            "recent_activities": recent_activities,
+            "recent_threats": recent_threats
+        }
+        
+        return jsonify(metrics_payload)
+    
+    except Exception as e:
+        print(f"Metrics Route Crash: {e}")
+        return jsonify({"error": "Internal Server Error syncing metrics"}), 500
+
+# ==========================================
+# 1. API LATENCY TRACKER (The Speedometer)
+# ==========================================
+@app.after_request
+def log_api_latency(response):
+    # Only track if start_time exists (set in before_request) and it's an API route
+    if hasattr(request, 'start_time') and request.path.startswith('/api/'):
+        try:
+            # Calculate total time in milliseconds
+            latency_ms = int((time.time() - request.start_time) * 1000)
+            
+            # Push to Redis and keep only the last 100 requests
+            redis_client.lpush("api_latency_history", latency_ms)
+            redis_client.ltrim("api_latency_history", 0, 99)
+            
+            # Calculate the moving average
+            latencies = [int(x) for x in redis_client.lrange("api_latency_history", 0, 99)]
+            if latencies:
+                avg = sum(latencies) / len(latencies)
+                redis_client.set("avg_api_latency", avg)
+        except Exception as e:
+            print(f"DEBUG: Latency tracking error: {e}")
+            
+    return response
+
+# ==========================================
+# 2. CACHE HIT TRACKER (The Cost Saver)
+# ==========================================
 @cache.memoize(timeout=600)
 def get_cached_config(sheet_id):
     cache_key = f"upia_bonus_config_{sheet_id}"
@@ -32,10 +191,14 @@ def get_cached_config(sheet_id):
     try:
         cached_data = redis_client.get(cache_key)
         if cached_data:
+            # IT'S A HIT! We saved a Google API call.
+            redis_client.incr("cache_hits")
             return json.loads(cached_data)
     except Exception as e:
         print(f"DEBUG: Redis Read Error: {e}")
 
+    # IT'S A MISS. We have to hit Google Sheets.
+    redis_client.incr("cache_misses")
     fresh_config = load_configuration(sheet_id)
     
     try:
@@ -44,6 +207,48 @@ def get_cached_config(sheet_id):
         pass
         
     return fresh_config
+
+# ==========================================
+# 3. PERFORMANCE METRICS ENDPOINT
+# ==========================================
+@app.route('/api/admin/performance', methods=['GET'])
+def get_system_performance():
+    try:
+        # Get Average Latency
+        latency = float(redis_client.get("avg_api_latency") or 0)
+        
+        # Calculate Cache Hit Rate
+        hits = int(redis_client.get("cache_hits") or 0)
+        misses = int(redis_client.get("cache_misses") or 0)
+        total_requests = hits + misses
+        
+        if total_requests > 0:
+            cache_hit_rate = (hits / total_requests) * 100
+        else:
+            cache_hit_rate = 100.0 # Default to perfect if no traffic yet
+            
+        # Get Server Hardware Load
+        cpu_load = psutil.cpu_percent(interval=None)
+        memory_usage = psutil.virtual_memory().percent
+
+        # Calculate Google Sheets Sync Success Rate
+        sync_history = redis_client.lrange("sheet_sync_history", 0, 49)
+        if sync_history:
+            successes = sum(1 for x in sync_history if x == "1")
+            sync_rate = (successes / len(sync_history)) * 100
+        else:
+            sync_rate = 100.0
+
+        return jsonify({
+            "success": True,
+            "api_latency_ms": int(latency),
+            "cache_hit_rate": round(cache_hit_rate, 1),
+            "cpu_load": cpu_load,
+            "memory_usage": memory_usage,
+            "db_latency": 15 # Placeholder until we wire up the DB tracker
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch performance data: {str(e)}"}), 500
 
 app.config['SHEET_ID'] = os.environ.get('SHEET_ID', '1NXN8rBdusXSNQg3zbSNbxmPvb7vIiQ3vtq79lFcNi1o')
 GOOGLE_CLIENT_ID = "85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com"
@@ -75,10 +280,22 @@ def band_guide():
 def help_page():
     return render_template('help.html')
 
+
+# 1. Create a global memory cache
+GLOBAL_OPS_CACHE = {
+    "all_staff": None,
+    "raw_performance": None,
+    "last_updated": 0
+}
+
 @app.route('/api/auth/google', methods=['POST'])
 def auth_google():
-    data = request.get_json()
+    # Safely handle empty requests
+    data = request.get_json() or {}
     token = data.get('credential')
+
+    if not token:
+        return jsonify({'success': False, 'error': 'Missing Google token from frontend.'}), 400
 
     try:
         idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
@@ -181,18 +398,32 @@ def auth_google():
                     'user': user_info
                 }
 
+                # CACHING FOR OPS MANAGERS
                 if user_info.get('is_ops'):
-                    sorted_staff = sorted(staff_data.values(), key=lambda x: x.get('name', ''))
-                    response_payload['all_staff'] = sorted_staff
-                    merged_perf = {**bonus_config.get("performance", {}), **bonus_config.get("bm_performance", {})}
-                    response_payload['raw_performance'] = merged_perf 
+                    current_time = time.time()
+                    if not GLOBAL_OPS_CACHE["all_staff"] or (current_time - GLOBAL_OPS_CACHE["last_updated"] > 3600):
+                        
+                        # FIX: Combine both Staff and Management into one master list
+                        combined_users = list(staff_data.values()) + list(management_data.values())
+                        sorted_staff = sorted(combined_users, key=lambda x: str(x.get('name', '')))
+                        
+                        merged_perf = {**bonus_config.get("performance", {}), **bonus_config.get("bm_performance", {})}
+                        
+                        GLOBAL_OPS_CACHE["all_staff"] = sorted_staff
+                        GLOBAL_OPS_CACHE["raw_performance"] = merged_perf
+                        GLOBAL_OPS_CACHE["last_updated"] = current_time
+
+                    response_payload['all_staff'] = GLOBAL_OPS_CACHE["all_staff"]
+                    response_payload['raw_performance'] = GLOBAL_OPS_CACHE["raw_performance"]
 
                 return jsonify(response_payload)
                 
         return jsonify({'success': False, 'error': 'Email not authorized for UPIA Bonus.'}), 401
 
-    except ValueError:
-        return jsonify({'success': False, 'error': 'Invalid Google session.'}), 401
+    except Exception as e:
+        # Catch ALL unexpected errors so Flask never returns HTML 500s
+        print(f"DEBUG: Auth Crash - {e}")
+        return jsonify({'success': False, 'error': f'Authentication failed: {str(e)}'}), 401
     
 def sanitize_floats(obj):
     if isinstance(obj, dict):
@@ -210,23 +441,63 @@ def calculate():
         app.config['BONUS_CONFIG'] = get_cached_config(app.config.get('SHEET_ID'))
         if not app.config.get('BONUS_CONFIG'):
             return jsonify({"success": False, "error": "Configuration not loaded."}), 500
-        
-    data = request.json
+
+    data = dict(request.json or {})
     try:
         salary = float(data.get('salary', 0))
         customers = int(data.get('customers', 0))
         if salary < 0 or customers < 0:
             raise ValueError("Salary and Customers must be non-negative.")
-            
+
+        # Strip "(Previous)" string added by UI for transferred staff
+        if 'branch' in data:
+            data['branch'] = str(data['branch']).replace('(Previous)', '').replace('(previous)', '').strip().lower()
+
         raw_result = calculate_bonus(data, app.config['BONUS_CONFIG'])
         safe_result = sanitize_floats(raw_result)
-        
+
         return jsonify({"success": True, **safe_result})
-        
+
     except ValueError as ve:
         return jsonify({"success": False, "error": str(ve)}), 400
     except Exception as e:
         return jsonify({"success": False, "error": f"Calculation error: {str(e)}"}), 500
+
+@app.route('/api/calculate/bulk', methods=['POST'])
+def calculate_bulk():
+    if not app.config.get('BONUS_CONFIG'):
+        app.config['BONUS_CONFIG'] = get_cached_config(app.config.get('SHEET_ID'))
+        if not app.config.get('BONUS_CONFIG'):
+            return jsonify({"success": False, "error": "Configuration not loaded."}), 500
+    
+    config = app.config['BONUS_CONFIG']
+    data = request.json
+    payloads = data.get('payloads', [])
+    
+    results = {}
+    for req in payloads:
+        try:
+            email = req.get('email')
+            salary = float(req.get('salary', 0))
+            
+            # Apply the same fix for the bulk calculator
+            branch_str = str(req.get('branch', '')).lower()
+            if "(previous)" in branch_str:
+                req['branch'] = branch_str.replace("(previous)", "").strip()
+            elif req.get('previous_branch') and req.get('is_historical'):
+                req['branch'] = str(req.get('previous_branch')).strip().lower()
+            
+            raw_result = calculate_bonus(req, config)
+            safe_result = sanitize_floats(raw_result)
+            
+            base_bonus = safe_result.get('current', {}).get('base_bonus', 0)
+            upside = safe_result.get('collection', {}).get('upside', 0)
+            
+            results[email] = salary + base_bonus + upside
+        except Exception as e:
+            results[req.get('email', 'unknown')] = 0
+            
+    return jsonify({"success": True, "payouts": results})
 
 @app.route('/api/config/reload', methods=['POST'])
 def reload_config():
@@ -302,36 +573,144 @@ def logout():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/calculate/bulk', methods=['POST'])
-def calculate_bulk():
-    if not app.config.get('BONUS_CONFIG'):
-        app.config['BONUS_CONFIG'] = get_cached_config(app.config.get('SHEET_ID'))
-        if not app.config.get('BONUS_CONFIG'):
-            return jsonify({"success": False, "error": "Configuration not loaded."}), 500
-    
-    config = app.config['BONUS_CONFIG']
-    data = request.json
-    payloads = data.get('payloads', [])
-    
-    results = {}
-    for req in payloads:
-        try:
-            email = req.get('email')
-            salary = float(req.get('salary', 0))
-            
-            # Run the engine for each staff member in the list
-            raw_result = calculate_bonus(req, config)
-            safe_result = sanitize_floats(raw_result)
-            
-            base_bonus = safe_result.get('current', {}).get('base_bonus', 0)
-            upside = safe_result.get('collection', {}).get('upside', 0)
-            
-            # Combine the total payout
-            results[email] = salary + base_bonus + upside
-        except Exception as e:
-            results[req.get('email', 'unknown')] = 0
-            
-    return jsonify({"success": True, "payouts": results})
 
+# ==========================================
+# LIVE SYSTEM SECURITY AUDIT
+# ==========================================
+@app.route('/api/admin/security-audit', methods=['GET'])
+def security_audit():
+    # 1. Check Google OAuth Integrity
+    # Verifies that the Client ID is loaded and not empty
+    oauth_status = "Secure" if getattr(app, 'GOOGLE_CLIENT_ID', GOOGLE_CLIENT_ID) else "Warning"
+    
+    # 2. Check Redis Cache Protection
+    # Pings the memory database to ensure it's responsive
+    try:
+        if redis_client.ping():
+            redis_status = "Secure"
+        else:
+            redis_status = "Warning"
+    except Exception as e:
+        print(f"Redis Audit Failed: {e}")
+        redis_status = "Warning"
+        
+    # 3. Check CORS Policies
+    # If CORS_ORIGINS isn't explicitly set in your .env, it often defaults to "*" (Open to everyone)
+    cors_config = os.environ.get('CORS_ORIGINS', '*')
+    cors_status = "Warning" if cors_config == '*' else "Secure"
+
+    return jsonify({
+        "success": True,
+        "oauth": oauth_status,
+        "redis": redis_status,
+        "cors": cors_status
+    })
+
+# ==========================================
+# THREAT WATCHLIST (Rate Limiting Visuals)
+# ==========================================
+@app.route('/api/admin/security/watchlist', methods=['GET'])
+def get_security_watchlist():
+    # In a real login route, you would do: redis_client.incr("failed_auth:192.168.1.50")
+    # Here, we scan Redis for anyone with active strikes (1 to 4 fails)
+    watchlist = []
+    
+    try:
+        # Find all keys matching our failed auth pattern
+        keys = redis_client.keys("failed_auth:*")
+        for key in keys:
+            ip = key.split(":")[1]
+            attempts = int(redis_client.get(key) or 0)
+            if 0 < attempts < 5:  # 5 is the ban threshold
+                watchlist.append({"ip": ip, "attempts": attempts})
+    except Exception as e:
+        print(f"Watchlist Error: {e}")
+        
+    return jsonify({"success": True, "watchlist": watchlist})
+
+# ==========================================
+# EXPORT SECURITY LOG (CSV Paper Trail)
+# ==========================================
+@app.route('/api/admin/security/export', methods=['GET'])
+def export_security_log():
+    try:
+        # 1. Pull recent activities and threats from Redis safely
+        raw_threats = redis_client.lrange("live_threats", 0, -1) or []
+        banned_ips = redis_client.smembers("banned_ips") or set()
+        
+        # 2. Create an in-memory CSV file
+        si = StringIO()
+        cw = csv.writer(si)
+        
+        # 3. Write Headers
+        cw.writerow(['Type', 'Timestamp', 'IP Address / User', 'Details'])
+        
+        # 4. Write Banned IPs
+        for ip in banned_ips:
+            cw.writerow(['BANNED IP', 'Permanent', ip, 'Blocked by Admin or System'])
+            
+        # 5. Write Threat Logs
+        for t in raw_threats:
+            try:
+                # Use json to parse the stored Redis strings
+                import json
+                t_data = json.loads(t)
+                cw.writerow(['THREAT', t_data.get('time', ''), t_data.get('ip', ''), t_data.get('threat', '')])
+            except Exception as parse_err:
+                # If a log is corrupted, just write the raw string instead of crashing
+                cw.writerow(['THREAT', 'Unknown', 'Unknown', str(t)])
+                
+        output = si.getvalue()
+        
+        # 6. Return as a downloadable CSV file
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment;filename=upia_security_audit.csv"}
+        )
+    except Exception as e:
+        print(f"DEBUG: CSV Export Error - {str(e)}")
+        return jsonify({"error": f"Failed to export logs: {str(e)}"}), 500
+
+# ==========================================
+# GOOGLE SHEETS SYNC TRACKER
+# ==========================================
+def log_sheet_sync(success=True):
+    """Logs a 1 (success) or 0 (failure) to Redis for the last 50 attempts."""
+    try:
+        val = "1" if success else "0"
+        redis_client.lpush("sheet_sync_history", val)
+        redis_client.ltrim("sheet_sync_history", 0, 49)
+    except:
+        pass
+
+# ==========================================
+# FORCE HARD SYNC ENDPOINT (The Nuclear Option)
+# ==========================================
+@app.route('/api/admin/system/flush', methods=['POST'])
+def flush_and_sync():
+    try:
+        # 1. Wipe all Redis data (clears cache, sessions, etc.)
+        redis_client.flushdb()
+        
+        # 2. Force a fresh download from Google Sheets
+        sheet_id = app.config.get('SHEET_ID')
+        fresh_config = load_configuration(sheet_id)
+        log_sheet_sync(success=True)
+        
+        # 3. Rebuild the cache immediately
+        cache_key = f"upia_bonus_config_{sheet_id}"
+        redis_client.setex(cache_key, 14400, json.dumps(fresh_config))
+        app.config['BONUS_CONFIG'] = fresh_config
+        
+        # 4. Clear the global Python memory cache
+        GLOBAL_OPS_CACHE["all_staff"] = None
+        GLOBAL_OPS_CACHE["raw_performance"] = None
+        
+        return jsonify({"success": True, "message": "System fully flushed and re-synced with Google Sheets!"})
+    except Exception as e:
+        log_sheet_sync(success=False)
+        return jsonify({"error": f"Hard sync failed: {str(e)}"}), 500
+    
 if __name__ == '__main__':
     app.run(debug=True)

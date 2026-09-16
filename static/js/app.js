@@ -48,6 +48,12 @@
                 sessionStorage.setItem('upia_google_token', response.credential);
                 sessionStorage.setItem('upia_user', JSON.stringify(finalUser)); 
                 
+                // 🚀 SPEED FIX: Pre-cache the massive Ops Payload right now so the dashboard loads instantly!
+                if (finalUser.is_ops) {
+                    if (data.all_staff) sessionStorage.setItem('upia_ops_staff', JSON.stringify(data.all_staff));
+                    if (data.raw_performance) sessionStorage.setItem('upia_ops_perf', JSON.stringify(data.raw_performance));
+                }
+                
                 if (authStatus) {
                     authStatus.innerHTML = `<span style="color: #10b981; font-weight: 600;">✓ Access granted. Redirecting...</span>`;
                 }
@@ -140,105 +146,122 @@
         };
 
         const getActiveProfile = (user, monthCode) => {
-            const transferDate = user.date_exited || user.date_reported; 
-            const transferMonthCode = getTransferMonthCode(transferDate);
+            // OPTIMIZATION: Return instantly if already calculated
+            if (!user._profileCache) user._profileCache = {};
+            if (user._profileCache[monthCode]) return user._profileCache[monthCode];
 
-            const hasPreviousBranch = user.previous_branch && String(user.previous_branch).trim() !== "";
+            const evaluate = () => {
+                const transferDate = user.date_exited || user.date_reported; 
+                const transferMonthCode = getTransferMonthCode(transferDate);
+                const hasPreviousBranch = user.previous_branch && String(user.previous_branch).trim() !== "";
 
-            if (hasPreviousBranch && monthCode <= transferMonthCode) {
+                if (hasPreviousBranch && monthCode <= transferMonthCode) {
+                    return {
+                        branch: toTitleCase(String(user.previous_branch).trim()), 
+                        type: String(user.previous_role || user.type).trim(), 
+                        pairs: String(user.previous_pairs || user.pairs || "1").trim(), 
+                        isHistorical: true
+                    };
+                }
+                
                 return {
-                    branch: toTitleCase(String(user.previous_branch).trim()), 
-                    type: String(user.previous_role || user.type).trim(), 
-                    // CRUCIAL: It now pulls the previous pairs from the backend
-                    pairs: String(user.previous_pairs || user.pairs || "1").trim(), 
-                    isHistorical: true
+                    branch: toTitleCase(String(user.branch || "").trim()),
+                    type: String(user.type || "").trim(),
+                    pairs: String(user.pairs || "1").trim(),
+                    isHistorical: false
                 };
-            }
-            
-            return {
-                branch: toTitleCase(String(user.branch || "").trim()),
-                type: String(user.type || "").trim(),
-                pairs: String(user.pairs || "1").trim(),
-                isHistorical: false
             };
+
+            const result = evaluate();
+            user._profileCache[monthCode] = result; // Save to cache
+            return result;
         };
 
         const checkLateReporting = (user, monthCode) => {
-            const isTransfer = user.previous_branch && String(user.previous_branch).trim() !== "";
-            if (isTransfer) return false; 
-            
-            // 1. If they have NO date in the system, they are disqualified
-            if (!user.date_reported) return true; 
+            // OPTIMIZATION: Stop re-parsing dates on every render
+            if (!user._lateCache) user._lateCache = {};
+            if (user._lateCache[monthCode] !== undefined) return user._lateCache[monthCode];
 
-            let str = String(user.date_reported).trim().split(' ')[0];
-            
-            // 2. Catch blank or "N/A" text
-            if (str === "" || str.toLowerCase().includes("n/a") || str.toLowerCase() === "none" || str.toLowerCase() === "not reported") {
-                return true; 
-            }
+            const evaluate = () => {
+                const isTransfer = user.previous_branch && String(user.previous_branch).trim() !== "";
+                if (isTransfer) return false; 
+                
+                if (!user.date_reported) return true; 
 
-            const parts = str.split(/[-/]/);
-            if (parts.length >= 3) {
-                let day, month, year;
-                
-                // 3. Dynamically read both YYYY-MM-DD and DD-MM-YYYY formats
-                if (parts[0].length === 4) { 
-                    year = parseInt(parts[0], 10);
-                    month = parseInt(parts[1], 10);
-                    day = parseInt(parts[2], 10);
-                } else { 
-                    day = parseInt(parts[0], 10);
-                    month = parseInt(parts[1], 10);
-                    year = parseInt(parts[2], 10);
-                }
-                
-                const reportMonthCode = `${year}${String(month).padStart(2, '0')}`;
-                
-                if (monthCode === reportMonthCode && day > 5) return true;
-                if (monthCode < reportMonthCode) return true;
-            } else {
-                // 4. Fallback for word-based dates (e.g., 10-Sep-2026)
-                const d = new Date(str);
-                if (!isNaN(d.getTime())) {
-                    const day = d.getDate();
-                    const reportMonthCode = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+                let str = String(user.date_reported).trim().split(' ')[0];
+                if (str === "" || str.toLowerCase().includes("n/a") || str.toLowerCase() === "none" || str.toLowerCase() === "not reported") return true; 
+
+                const parts = str.split(/[-/]/);
+                if (parts.length >= 3) {
+                    let day, month, year;
+                    if (parts[0].length === 4) { 
+                        year = parseInt(parts[0], 10); month = parseInt(parts[1], 10); day = parseInt(parts[2], 10);
+                    } else { 
+                        day = parseInt(parts[0], 10); month = parseInt(parts[1], 10); year = parseInt(parts[2], 10);
+                    }
+                    const reportMonthCode = `${year}${String(month).padStart(2, '0')}`;
                     if (monthCode === reportMonthCode && day > 5) return true;
                     if (monthCode < reportMonthCode) return true;
+                } else {
+                    const d = new Date(str);
+                    if (!isNaN(d.getTime())) {
+                        const day = d.getDate();
+                        const reportMonthCode = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        if (monthCode === reportMonthCode && day > 5) return true;
+                        if (monthCode < reportMonthCode) return true;
+                    }
                 }
-            }
-            return false;
+                return false;
+            };
+
+            const result = evaluate();
+            user._lateCache[monthCode] = result; // Save to cache
+            return result;
         };
+
+
+        // 🚀 SPEED FIX: Global dictionary to prevent millions of loop iterations
+        let _perfIndexCache = null;
 
         const computePerformanceForUser = (user, perfData) => {
             if (!user || !perfData) return;
             user.performance = {};
 
-            for (const [key, metrics] of Object.entries(perfData || {})) {
-                const parts = key.split('_');
-                const monthCode = parts[parts.length - 1]; 
+            // 1. Build the fast-lookup dictionary EXACTLY ONCE for the whole app
+            if (!_perfIndexCache) {
+                _perfIndexCache = {};
+                Object.entries(perfData).forEach(([key, metrics]) => {
+                    const parts = key.split('_');
+                    const mCode = parts.pop(); // The last item is the month
+                    const prefix = parts.join('_').toLowerCase(); 
+                    if (!_perfIndexCache[mCode]) _perfIndexCache[mCode] = {};
+                    _perfIndexCache[mCode][prefix] = metrics;
+                });
+            }
 
+            // 2. Lookup data instantly in O(1) time
+            Object.keys(_perfIndexCache).forEach(monthCode => {
                 const profile = getActiveProfile(user, monthCode);
                 const targetBranch = (profile.branch || '').toLowerCase().trim();
                 const targetType = (profile.type || '').toUpperCase();
-                
                 const isBM = targetType.includes('BM') || targetType.includes('MANAGER');
 
+                let lookupKey = '';
                 if (isBM) {
-                    if (parts.length === 2 && parts[0] === targetBranch) {
-                        user.performance[monthCode] = metrics;
-                    }
+                    lookupKey = targetBranch;
                 } else {
                     let rawPair = String(profile.pairs).toLowerCase().trim();
                     if (rawPair === '1' || rawPair === '') rawPair = 'pair 1';
                     else if (rawPair === '2') rawPair = 'pair 2';
                     else if (rawPair === '3') rawPair = 'pair 3';
-                    
-                    const prefix = `${targetBranch}_${rawPair}_`;
-                    if (key.toLowerCase().startsWith(prefix)) {
-                        user.performance[monthCode] = metrics;
-                    }
+                    lookupKey = `${targetBranch}_${rawPair}`;
                 }
-            }
+
+                // If a match exists in the dictionary, assign it instantly!
+                if (_perfIndexCache[monthCode][lookupKey]) {
+                    user.performance[monthCode] = _perfIndexCache[monthCode][lookupKey];
+                }
+            });
         };
 
         const cachedUserStr = sessionStorage.getItem('upia_user');
@@ -894,7 +917,8 @@
                 disbursement: currentMetrics.disbursement / 100, active_customers: currentMetrics.active_customers / 100,
                 new_customers: currentMetrics.new_customers / 100, otc: currentMetrics.otc / 100, dd7: currentMetrics.dd7 / 100, new_customer_otc: currentMetrics.new_customer_otc / 100,
                 date_reported: safeDateReported,
-                month: selectedMonth
+                month: selectedMonth,
+                is_previous: activeProfile.isHistorical // Explicitly notify Python backend of transfer status
             };
 
             try {
@@ -1164,6 +1188,30 @@
                 if (loggedInUser.is_ops) {
                     const token = sessionStorage.getItem('upia_google_token');
                     if (token) {
+                        // 1. INSTANT RENDER FROM BROWSER MEMORY
+                        const cachedStaffStr = sessionStorage.getItem('upia_ops_staff');
+                        const cachedPerfStr = sessionStorage.getItem('upia_ops_perf');
+                        
+                        if (cachedStaffStr && cachedPerfStr) {
+                            try {
+                                allStaffData = JSON.parse(cachedStaffStr);
+                                filteredStaff = allStaffData;
+                                rawPerformance = JSON.parse(cachedPerfStr);
+                                
+                                const skelStaff = document.getElementById('skeleton-staff-tbody');
+                                const skelAnalytics = document.getElementById('ops-analytics-skeleton');
+                                if (skelStaff) skelStaff.style.display = 'none';
+                                if (skelAnalytics) skelAnalytics.style.display = 'none';
+                                
+                                document.getElementById('ops-staff-tbody').style.display = 'table-row-group';
+                                document.getElementById('ops-analytics-content').style.display = 'block';
+                                
+                                renderOpsStaffTable();
+                                renderOpsAnalytics(rawPerformance);
+                            } catch(e) { console.error('Cache restore error', e); }
+                        }
+
+                        // 2. SILENT BACKGROUND FETCH (Does not block the screen!)
                         fetch('/api/auth/google', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1172,27 +1220,36 @@
                         .then(res => res.json())
                         .then(data => {
                             if (data && data.success) {
-                                // 🛑 FREEZE FIX: Pause for 50ms so the screen can draw!
                                 setTimeout(() => {
-                                    if (data.all_staff) {
-                                        allStaffData = data.all_staff;
-                                        filteredStaff = allStaffData;
-                                    }
-                                    if (data.raw_performance) rawPerformance = data.raw_performance;
+                                    const newStaffStr = JSON.stringify(data.all_staff || []);
+                                    const newPerfStr = JSON.stringify(data.raw_performance || {});
                                     
-                                    renderOpsStaffTable();
-                                    renderOpsAnalytics(rawPerformance);
+                                    // 3. ONLY RE-RENDER IF THE DATA ACTUALLY CHANGED
+                                    if (newStaffStr !== cachedStaffStr || newPerfStr !== cachedPerfStr) {
+                                        if (data.all_staff) {
+                                            allStaffData = data.all_staff;
+                                            filteredStaff = allStaffData;
+                                            sessionStorage.setItem('upia_ops_staff', newStaffStr);
+                                        }
+                                        if (data.raw_performance) {
+                                            rawPerformance = data.raw_performance;
+                                            sessionStorage.setItem('upia_ops_perf', newPerfStr);
+                                        }
+                                        
+                                        renderOpsStaffTable();
+                                        renderOpsAnalytics(rawPerformance);
+                                        
+                                        const skelStaff = document.getElementById('skeleton-staff-tbody');
+                                        const dataStaff = document.getElementById('ops-staff-tbody');
+                                        if (skelStaff) skelStaff.style.display = 'none';
+                                        if (dataStaff) dataStaff.style.display = 'table-row-group';
 
-                                    const skelStaff = document.getElementById('skeleton-staff-tbody');
-                                    const dataStaff = document.getElementById('ops-staff-tbody');
-                                    if (skelStaff) skelStaff.style.display = 'none';
-                                    if (dataStaff) dataStaff.style.display = 'table-row-group';
-
-                                    const skelAnalytics = document.getElementById('ops-analytics-skeleton');
-                                    const dataAnalytics = document.getElementById('ops-analytics-content');
-                                    if (skelAnalytics) skelAnalytics.style.display = 'none';
-                                    if (dataAnalytics) dataAnalytics.style.display = 'block';
-                                }, 50); // <-- 50ms breathing room
+                                        const skelAnalytics = document.getElementById('ops-analytics-skeleton');
+                                        const dataAnalytics = document.getElementById('ops-analytics-content');
+                                        if (skelAnalytics) skelAnalytics.style.display = 'none';
+                                        if (dataAnalytics) dataAnalytics.style.display = 'block';
+                                    }
+                                }, 100); // Wait 100ms so network thread yields to UI thread
                             }
                         })
                         .catch(err => console.error("Error fetching ops data:", err));
@@ -1217,25 +1274,6 @@
     }
 })();
 
-window.renderGoogleButton = function() {
-    const container = document.getElementById('g_id_signin_container');
-    if (!container || typeof google === 'undefined' || !google.accounts) return;
-
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    container.innerHTML = '';
-    
-    google.accounts.id.renderButton(container, { 
-        type: "standard", 
-        shape: "rectangular", 
-        theme: currentTheme === 'dark' ? "filled_black" : "outline", 
-        text: "signin_with",  // Changes text to "Sign in with Google"
-        size: "large", 
-        logo_alignment: "left" 
-    });
-    
-};
-
-window.addEventListener('load', () => setTimeout(window.renderGoogleButton, 300));
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
