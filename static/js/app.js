@@ -20,56 +20,57 @@
         }
     };
 
-    window.handleGoogleLogin = async (response) => {
-        const authStatus = document.getElementById('auth-status-text');
-        const loginError = document.getElementById('login-error');
-        if (loginError) loginError.style.display = 'none';
+  window.handleGoogleLogin = async (response) => {
+    const authStatus = document.getElementById('auth-status-text');
+    const loginError = document.getElementById('login-error');
+    if (loginError) loginError.style.display = 'none';
 
-        if (authStatus) {
-            authStatus.innerHTML = `<span style="color: var(--text-muted); font-weight: 500;">Authenticating securely... Please wait.</span>`;
-            authStatus.style.display = 'block';
-        }
+    if (authStatus) {
+        authStatus.innerHTML = `<span style="color: var(--text-muted); font-weight: 500;">Authenticating securely... Please wait.</span>`;
+        authStatus.style.display = 'block';
+    }
 
-        try {
-            const res = await fetch('/api/auth/google', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ credential: response.credential })
-            });
-            const data = await res.json();
+    try {
+        const res = await fetch('/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential })
+        });
+        const data = await res.json();
 
-            if (data.success) {
-                const googlePayload = decodeJwt(response.credential);
-                const finalUser = data.user;
-                if (googlePayload.picture) {
-                    finalUser.picture = googlePayload.picture;
-                }
-
-                sessionStorage.setItem('upia_google_token', response.credential);
-                sessionStorage.setItem('upia_user', JSON.stringify(finalUser)); 
-                
-                // 🚀 SPEED FIX: Pre-cache the massive Ops Payload right now so the dashboard loads instantly!
-                if (finalUser.is_ops) {
-                    if (data.all_staff) sessionStorage.setItem('upia_ops_staff', JSON.stringify(data.all_staff));
-                    if (data.raw_performance) sessionStorage.setItem('upia_ops_perf', JSON.stringify(data.raw_performance));
-                }
-                
-                if (authStatus) {
-                    authStatus.innerHTML = `<span style="color: #10b981; font-weight: 600;">✓ Access granted. Redirecting...</span>`;
-                }
-                
-                window.location.href = '/overview';
-            } else {
-                throw new Error(data.error || "Unauthorized access.");
+        if (data.success) {
+            const googlePayload = decodeJwt(response.credential);
+            const finalUser = data.user;
+            if (googlePayload.picture) {
+                finalUser.picture = googlePayload.picture;
             }
-        } catch (err) {
-            if (authStatus) authStatus.style.display = 'none';
-            if (loginError) {
-                loginError.textContent = err.message || "Authentication failed.";
-                loginError.style.display = 'block';
+
+            sessionStorage.setItem('upia_google_token', response.credential);
+            sessionStorage.setItem('upia_user', JSON.stringify(finalUser)); 
+            
+            // Pre-cache Ops Payload for instant dashboard loading
+            if (finalUser.is_ops) {
+                if (data.all_staff) sessionStorage.setItem('upia_ops_staff', JSON.stringify(data.all_staff));
+                if (data.raw_performance) sessionStorage.setItem('upia_ops_perf', JSON.stringify(data.raw_performance));
             }
+            
+            if (authStatus) {
+                authStatus.innerHTML = `<span style="color: #10b981; font-weight: 600;">✓ Access granted. Redirecting...</span>`;
+            }
+            
+            window.location.href = '/overview';
+        } else {
+            throw new Error(data.error || "Unauthorized access.");
         }
-    };
+    } catch (err) {
+        if (authStatus) authStatus.style.display = 'none';
+        if (loginError) {
+            loginError.textContent = err.message || "Authentication failed.";
+            loginError.style.display = 'block';
+        }
+    }
+};
+
 window.renderGoogleButton = function() {
     const container = document.getElementById('g_id_signin_container');
     if (!container || typeof google === 'undefined' || !google.accounts) return;
@@ -77,11 +78,18 @@ window.renderGoogleButton = function() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
     container.innerHTML = '';
 
+    // Initialize programmatically without auto-prompt popups
+    google.accounts.id.initialize({
+        client_id: "85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com",
+        callback: window.handleGoogleLogin,
+        auto_select: false
+    });
+
     google.accounts.id.renderButton(container, { 
         type: "standard", 
         shape: "rectangular", 
         theme: currentTheme === 'dark' ? "filled_black" : "outline", 
-        text: "continue_with", 
+        text: "signin_with", // FIXED: Forces clean "Sign in with Google" text
         size: "large", 
         logo_alignment: "left" 
     });
