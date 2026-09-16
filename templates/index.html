@@ -37,9 +37,26 @@
                 data-callback="handleGoogleLogin"
                 data-auto_prompt="false">
             </div>
-                <!-- Clean Target Container for Programmatic JS Rendering -->
+                <!-- Google Sign-In Wrapper -->
+                <div id="g_id_onload"
+                    data-client_id="85732911341-tfjnf14n13laa692di7ntici1d17b3pe.apps.googleusercontent.com"
+                    data-context="signin"
+                    data-ux_mode="popup"
+                    data-callback="handleGoogleLogin"
+                    data-auto_select="false"
+                    data-auto_prompt="false">
+                </div>
+
+                <!-- Native Google Sign-In Button -->
                 <div style="display: flex; justify-content: center; margin-bottom: 12px; min-height: 40px;">
-                    <div id="g_id_signin_container"></div>
+                    <div class="g_id_signin"
+                        data-type="standard"
+                        data-shape="rectangular"
+                        data-theme="outline"
+                        data-text="signin_with"
+                        data-size="large"
+                        data-logo_alignment="left">
+                    </div>
                 </div>
 
                 <p id="auth-status-text" style="display: none; color: var(--success); font-size: 13px; margin-top: 16px; font-weight: 600;">
