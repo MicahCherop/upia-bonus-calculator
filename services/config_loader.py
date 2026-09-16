@@ -3,7 +3,7 @@ import io
 import re
 import urllib.parse
 import urllib.request
-
+from concurrent.futures import ThreadPoolExecutor
 def fetch_csv_rows(sheet_id, sheet_name):
     encoded_name = urllib.parse.quote(sheet_name)
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_name}"
@@ -15,6 +15,7 @@ def fetch_csv_rows(sheet_id, sheet_name):
     except Exception as e:
         print(f"Error fetching sheet {sheet_name}: {e}")
         return []
+
 
 def load_configuration(sheet_id):
     try:
@@ -32,20 +33,35 @@ def load_configuration(sheet_id):
         try:
             management_rows = fetch_csv_rows(sheet_id, 'Management')
             for row in management_rows[1:]:
-                if len(row) >= 3:
-                    name = str(row[0]).strip()
-                    email = str(row[1]).strip().lower()
-                    role = str(row[2]).strip().upper()
-                    
-                    if email:
-                        config["management"][email] = {
-                            "name": name,
-                            "email": email,
-                            "role": role,
-                            "branch": "HQ",  
-                            "id": "MGT",     
-                            "type": role     
-                        }
+                # Force padding so we never hit an index error
+                while len(row) < 6: row.append("")
+                
+                email = ""
+                name = str(row[0]).strip()
+                role = "ADMIN"
+                
+                # Scan the first 4 columns to find the email address
+                for i in range(4):
+                    cell_val = str(row[i]).strip().lower()
+                    if '@' in cell_val:
+                        email = cell_val
+                        # Assume the column immediately after the email is the Role
+                        if i + 1 < len(row) and str(row[i+1]).strip():
+                            role = str(row[i+1]).strip().upper()
+                        # Assume the column immediately before the email is the Name
+                        if i - 1 >= 0 and str(row[i-1]).strip():
+                            name = str(row[i-1]).strip()
+                        break
+                
+                if email:
+                    config["management"][email] = {
+                        "name": name,
+                        "email": email,
+                        "role": role,
+                        "branch": "HQ",  
+                        "id": "MGT",     
+                        "type": role     
+                    }
         except Exception as e:
             print(f"Warning: Could not fetch Management sheet data. Error: {e}")
             
@@ -149,41 +165,63 @@ def _get_fallback_config():
         "loco_bands": _parse_bands(),
         "bm_bands": _parse_bm_bands(),
         "collection_upside": {"loco_1pair": [], "bm_2_3pair": []},
-        "staff": {}, 
-        "performance": {},
-        "bm_performance": {} 
+        "staff": {}, "performance": {}, "bm_performance": {} 
     }
-    
+
 def _parse_staff_list(rows):
     employees = {}
     if not rows or len(rows) < 2:
         return employees
-        
-    for row in rows[1:]:
+
+    # FIRST PASS: Setup Active Employees by Email
+    valid_rows = []
+    for r in rows[1:]:
         try:
-            # STRICTLY PAD ROW TO PREVENT ERRORS
-            while len(row) < 12:
-                row.append("")
-                
-            email = str(row[2]).strip().lower() # Column C
-            if email and email != 'nan' and '@' in email:
-                employees[email] = {
-                    "branch": str(row[0]).strip(),           # Column A (Current Branch)
-                    "name": str(row[1]).strip(),             # Column B 
-                    "email": email,                          # Column C
-                    "pairs": str(row[3]).strip() or "1",     # Column D
-                    "type": str(row[4]).strip(),             # Column E
-                    "id": str(row[5]).strip() or "N/A",      # Column F
-                    "date_reported": str(row[6]).strip(),    # Column G
-                    
-                    # STRICT COLUMN MAPPINGS
-                    "previous_staff": str(row[7]).strip(),   # Column H
-                    "previous_branch": str(row[8]).strip(),  # Column I (Previous Branch)
-                    "previous_role": str(row[9]).strip(),    # Column J
-                    "date_exited": str(row[10]).strip()      # Column K
-                }
-        except Exception as e:
+            if len(r) > 2 and '@' in str(r[2]):
+                while len(r) < 12: r.append("")
+                valid_rows.append(r)
+        except Exception:
             continue
+
+    for row in valid_rows:
+        email = str(row[2]).strip().lower()
+        if email not in employees:
+            employees[email] = {
+                "branch": str(row[0]).strip(),
+                "name": str(row[1]).strip(),
+                "email": email,
+                "pairs": str(row[3]).strip() or "1",
+                "type": str(row[4]).strip(),
+                "id": str(row[5]).strip() or "N/A",
+                "date_reported": str(row[6]).strip(),
+                "previous_staff": "",
+                "previous_branch": "",
+                "previous_role": "",
+                "previous_pairs": "", # ADDED: Initializes previous pairs
+                "date_exited": ""
+            }
+
+    # SECOND PASS: THE HACK - Match Col H to Col A
+    for search_row in rows[1:]:
+        try:
+            while len(search_row) < 12: search_row.append("")
+            
+            # Scans Column H for a name (e.g., Nelson Mandela)
+            col_h_name = str(search_row[7]).strip().lower()
+            
+            if col_h_name:
+                # Find the active employee that matches this name
+                for email, emp in employees.items():
+                    if emp["name"].lower() == col_h_name:
+                        # Found them! Steal the data from this old row.
+                        emp["previous_staff"] = str(search_row[7]).strip()
+                        emp["previous_branch"] = str(search_row[0]).strip() # Column A
+                        emp["date_exited"] = str(search_row[10]).strip()    # Column K
+                        emp["previous_role"] = str(search_row[9]).strip() or str(search_row[4]).strip()
+                        emp["previous_pairs"] = str(search_row[3]).strip() or "1" # ADDED: Steals the old Pairs (Column D)
+        except Exception:
+            continue
+
     return employees
 
 def _normalize_month_code(raw_val):
@@ -196,82 +234,59 @@ def _normalize_month_code(raw_val):
 
 def _parse_performance(rows):
     perf_records = {}
-    if not rows or len(rows) < 2:
-        return perf_records
-
+    if not rows or len(rows) < 2: return perf_records
     headers = [str(c).strip().lower() for c in rows[0]]
     data_rows = rows[1:]
-
     last_seen = ["", "", "", ""]
 
     for row in data_rows:
         try:
             if not row: continue
-
-            while len(row) < len(headers):
-                row.append("")
-
+            while len(row) < len(headers): row.append("")
             for col_idx in range(min(4, len(row))):
                 val = str(row[col_idx]).strip()
-                if val and val.lower() not in ['nan', 'null', '']:
-                    last_seen[col_idx] = val
-                else:
-                    row[col_idx] = last_seen[col_idx]
+                if val and val.lower() not in ['nan', 'null', '']: last_seen[col_idx] = val
+                else: row[col_idx] = last_seen[col_idx]
 
             month_code = _normalize_month_code(row[0])
             branch = str(row[2]).strip().lower()
             pair = str(row[3]).strip().lower()
 
             if month_code and branch and pair and month_code != 'nan':
-
                 def _clean_float(val):
                     if val is None: return 0.0
                     try:
                         v_str = str(val).strip().replace('%', '').replace(',', '').replace('KES', '')
-                        if v_str.lower() in ['-', '', 'nan', '#n/a', '#ref!', '#value!', 'null', 'none']:
-                            return 0.0
+                        if v_str.lower() in ['-', '', 'nan', '#n/a', '#ref!', '#value!', 'null', 'none']: return 0.0
                         return float(v_str)
-                    except Exception:
-                        return 0.0
+                    except Exception: return 0.0
 
                 def get_val(possible_keywords, col_idx):
                     for kw in possible_keywords:
                         for idx, col_name in enumerate(headers):
                             if kw in col_name:
                                 v = row[idx]
-                                if v is not None and str(v).strip() != '':
-                                    return _clean_float(v)
+                                if v is not None and str(v).strip() != '': return _clean_float(v)
                     if len(row) > col_idx:
                         v = row[col_idx]
-                        if v is not None and str(v).strip() != '':
-                            return _clean_float(v)
+                        if v is not None and str(v).strip() != '': return _clean_float(v)
                     return 0.0
 
                 lookup_key = f"{branch}_{pair}_{month_code}"
                 perf_records[lookup_key] = {
-                    "disb_target": get_val(["disb target"], 4),
-                    "disb_actual": get_val(["disb amnt"], 5),
-                    "disb_rate": get_val(["disb rate"], 6),
-                    "ac_target": get_val(["ac target"], 7),
-                    "ac_actual": get_val(["ac actual"], 8),
-                    "ac_rate": get_val(["ac rate"], 9),
-                    "nc_target": get_val(["nc target"], 13),
-                    "nc_actual": get_val(["nc actual"], 14),
-                    "nc_rate": get_val(["nc rate"], 15),
-                    "overall_otc": get_val(["ovrll otc", "overall otc"], 16),
-                    "dd7_rate": get_val(["dd7 rate", "dd7"], 19),
-                    "new_customer_otc": get_val(["new customer", "nc otc", "new cust otc"], 21)
+                    "disb_target": get_val(["disb target"], 4), "disb_actual": get_val(["disb amnt"], 5),
+                    "disb_rate": get_val(["disb rate"], 6), "ac_target": get_val(["ac target"], 7),
+                    "ac_actual": get_val(["ac actual"], 8), "ac_rate": get_val(["ac rate"], 9),
+                    "nc_target": get_val(["nc target"], 13), "nc_actual": get_val(["nc actual"], 14),
+                    "nc_rate": get_val(["nc rate"], 15), "overall_otc": get_val(["ovrll otc", "overall otc"], 16),
+                    "dd7_rate": get_val(["dd7 rate", "dd7"], 19), "new_customer_otc": get_val(["new customer", "nc otc", "new cust otc"], 21)
                 }
-        except Exception as e:
-            continue
-
+        except Exception: continue
     return perf_records
 
 def _parse_bm_performance(rows):
     perf_records = {}
-    if not rows or len(rows) < 2:
-        return perf_records
-
+    if not rows or len(rows) < 2: return perf_records
     data_rows = rows[1:]
     last_month = ""
     last_branch = ""
@@ -279,21 +294,15 @@ def _parse_bm_performance(rows):
     for row in data_rows:
         try:
             if not row: continue
+            while len(row) < 21: row.append("")
             
-            while len(row) < 21: 
-                row.append("")
-
             val_a = str(row[0]).strip()
-            if val_a and val_a.lower() not in ['nan', 'null', '']:
-                last_month = val_a
-            else:
-                row[0] = last_month
+            if val_a and val_a.lower() not in ['nan', 'null', '']: last_month = val_a
+            else: row[0] = last_month
 
             val_e = str(row[4]).strip()
-            if val_e and val_e.lower() not in ['nan', 'null', '']:
-                last_branch = val_e
-            else:
-                row[4] = last_branch
+            if val_e and val_e.lower() not in ['nan', 'null', '']: last_branch = val_e
+            else: row[4] = last_branch
 
             month_code = _normalize_month_code(row[0])
             branch = str(row[4]).strip().lower()
@@ -303,28 +312,18 @@ def _parse_bm_performance(rows):
                     if val is None: return 0.0
                     try:
                         v_str = str(val).strip().replace('%', '').replace(',', '').replace('KES', '')
-                        if v_str.lower() in ['-', '', 'nan', '#n/a', '#ref!', '#value!', 'null', 'none']:
-                            return 0.0
+                        if v_str.lower() in ['-', '', 'nan', '#n/a', '#ref!', '#value!', 'null', 'none']: return 0.0
                         return float(v_str)
-                    except Exception:
-                        return 0.0
+                    except Exception: return 0.0
 
                 lookup_key = f"{branch}_{month_code}"
                 perf_records[lookup_key] = {
-                    "disb_target": _clean_float(row[5]),      # Col F
-                    "disb_actual": _clean_float(row[6]),      # Col G
-                    "disb_rate": _clean_float(row[7]),        # Col H
-                    "ac_target": _clean_float(row[8]),        # Col I
-                    "ac_actual": _clean_float(row[9]),        # Col J
-                    "ac_rate": _clean_float(row[10]),         # Col K
-                    "nc_target": _clean_float(row[11]),       # Col L
-                    "nc_actual": _clean_float(row[12]),       # Col M
-                    "nc_rate": _clean_float(row[13]),         # Col N
-                    "overall_otc": _clean_float(row[14]),     # Col O
-                    "dd7_rate": _clean_float(row[17]),        # Col R
-                    "new_customer_otc": _clean_float(row[19]) # Col T 
+                    "disb_target": _clean_float(row[5]), "disb_actual": _clean_float(row[6]),
+                    "disb_rate": _clean_float(row[7]), "ac_target": _clean_float(row[8]),
+                    "ac_actual": _clean_float(row[9]), "ac_rate": _clean_float(row[10]),
+                    "nc_target": _clean_float(row[11]), "nc_actual": _clean_float(row[12]),
+                    "nc_rate": _clean_float(row[13]), "overall_otc": _clean_float(row[14]),
+                    "dd7_rate": _clean_float(row[17]), "new_customer_otc": _clean_float(row[19]) 
                 }
-        except Exception as e:
-            continue
-
+        except Exception: continue
     return perf_records

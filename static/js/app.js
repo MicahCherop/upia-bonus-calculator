@@ -148,16 +148,17 @@
             if (hasPreviousBranch && monthCode <= transferMonthCode) {
                 return {
                     branch: toTitleCase(String(user.previous_branch).trim()), 
-                    type: (user.previous_role || user.type).trim(), 
-                    pairs: user.pairs, 
+                    type: String(user.previous_role || user.type).trim(), 
+                    // CRUCIAL: It now pulls the previous pairs from the backend
+                    pairs: String(user.previous_pairs || user.pairs || "1").trim(), 
                     isHistorical: true
                 };
             }
             
             return {
                 branch: toTitleCase(String(user.branch || "").trim()),
-                type: (user.type || "").trim(),
-                pairs: user.pairs,
+                type: String(user.type || "").trim(),
+                pairs: String(user.pairs || "1").trim(),
                 isHistorical: false
             };
         };
@@ -1094,6 +1095,17 @@ document.getElementById('btn-force-sync')?.addEventListener('click', (e) => {
             btn.innerHTML = 'Sync Failed';
             btn.style.pointerEvents = 'auto';
         });
+});
+
+document.getElementById('btn-logout-drawer')?.addEventListener('click', async () => { 
+    try {
+        // Send fast logout signal to clear backend Redis cache
+        await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+        console.warn('Logout endpoint warning:', e);
+    }
+    sessionStorage.clear(); 
+    window.location.href = '/'; 
 });
 
 document.addEventListener('DOMContentLoaded', () => {

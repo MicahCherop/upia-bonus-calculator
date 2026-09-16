@@ -290,5 +290,17 @@ def sync_chat():
     except Exception as e:
         return jsonify({"success": False, "error": "Failed to sync chat."}), 500
 
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    try:
+        sheet_id = app.config.get('SHEET_ID')
+        # Invalidate both Flask SimpleCache and Redis keys
+        cache.delete_memoized(get_cached_config, sheet_id)
+        if redis_client:
+            redis_client.delete(f"upia_bonus_config_{sheet_id}")
+        return jsonify({"success": True, "message": "Logged out and cache invalidated."})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
