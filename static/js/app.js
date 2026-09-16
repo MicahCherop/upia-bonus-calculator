@@ -70,7 +70,22 @@
             }
         }
     };
+window.renderGoogleButton = function() {
+    const container = document.getElementById('g_id_signin_container');
+    if (!container || typeof google === 'undefined' || !google.accounts) return;
 
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    container.innerHTML = '';
+
+    google.accounts.id.renderButton(container, { 
+        type: "standard", 
+        shape: "rectangular", 
+        theme: currentTheme === 'dark' ? "filled_black" : "outline", 
+        text: "continue_with", 
+        size: "large", 
+        logo_alignment: "left" 
+    });
+};
     const appWrapper = document.getElementById('app-wrapper');
     if (appWrapper) {
         let loggedInUser = null;
