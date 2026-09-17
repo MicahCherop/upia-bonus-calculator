@@ -33,7 +33,9 @@ def calculate_bonus(data, config):
     # 1. Eligibility Check
     criteria = config.get('criteria', {})
         
-    disb_ok = round(float(data.get('disbursement', 0)), 4) >= criteria.get('disbursement', 0.98)
+    disb_val = round(float(data.get('disbursement', 0)), 4)
+    disb_ok = disb_val >= criteria.get('disbursement', 0.98)
+    
     ac_ok = round(float(data.get('active_customers', 0)), 4) >= criteria.get('active_customers', 0.95)
     nc_ok = round(float(data.get('new_customers', 0)), 4) >= criteria.get('new_customers', 0.95)
     otc_ok = round(float(data.get('otc', 0)), 4) >= criteria.get('otc', 0.915)
@@ -51,25 +53,38 @@ def calculate_bonus(data, config):
     # --------------------------------------------------------
 
     full_bonus = disb_ok and ac_ok and nc_ok and otc_ok and dd7_ok and new_otc_ok
-    collection_bonus_45 = (not full_bonus) and (otc_ok and dd7_ok and new_otc_ok)
+    
+    # --- 45% BONUS QUALIFICATION (Added 95% Disbursement Minimum) ---
+    disb_45_ok = disb_val >= 0.95
+    collection_bonus_45 = (not full_bonus) and (otc_ok and dd7_ok and new_otc_ok and disb_45_ok)
 
     # --- DATE REPORTED LOGIC ---
-    date_reported_str = str(data.get('date_reported', '')).strip().split(' ')[0]
+    date_reported_raw = str(data.get('date_reported', '')).strip().lower()
+    
+    # Catch any garbage strings sent by JS or Sheets
+    safe_blanks = ['nan', 'null', 'n/a', 'na', 'none', 'not reported', '-', 'invalid date', 'undefined', '']
+    
+    # Safely strip timestamps or ISO 'T' markers to isolate the date
+    date_reported_str = date_reported_raw.split(' ')[0].split('t')[0]
+    
+    if date_reported_raw in safe_blanks or date_reported_str in safe_blanks:
+        date_reported_str = ''
+        
     date_disqualified = False 
     
-    # 1. Skip date disqualification for historical/transferred staff or empty strings sent by frontend
-    if is_historical or not date_reported_str or date_reported_str.lower() in ['n/a', 'na', 'none', 'not reported', '']:
+    # RULE: If Date Reported is empty or staff is transferred, there is NO date limit.
+    if not date_reported_str or is_historical:
         date_disqualified = False
         
     elif month_code and len(month_code) == 6:
         from datetime import datetime, date
         
         def _parse_date(d_str):
+            # Covers 2-digit years (%y), 4-digit years (%Y), and text months (%b)
             formats = [
-                '%d-%m-%Y', '%d/%m/%Y', 
-                '%Y-%m-%d', '%Y/%m/%d',
-                '%d-%b-%Y', '%d %b %Y',
-                '%m-%d-%Y', '%m/%d/%Y'
+                '%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%Y/%m/%d',
+                '%d-%b-%Y', '%d %b %Y', '%m-%d-%Y', '%m/%d/%Y',
+                '%d-%m-%y', '%d/%m/%y', '%m-%d-%y', '%m/%d/%y'
             ]
             for fmt in formats:
                 try:
@@ -84,6 +99,7 @@ def calculate_bonus(data, config):
                 perf_year = int(month_code[:4])
                 perf_month = int(month_code[4:6])
                 
+                # Check 5th of the month cutoff ONLY for staff with an actual reporting date
                 cutoff_date = date(perf_year, perf_month, 5)
                 
                 if rep_date > cutoff_date:
@@ -93,6 +109,7 @@ def calculate_bonus(data, config):
                     
             except Exception:
                 pass
+    # --------------------------------
 
     eligibility = {
         "full_bonus": full_bonus,
@@ -227,6 +244,7 @@ def calculate_bonus(data, config):
             "upside": collection_upside
         }
     }
+
 def evaluate_criteria(data, criteria_targets, emp_type=""):
     results = []
     

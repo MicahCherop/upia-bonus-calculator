@@ -767,6 +767,36 @@
                 alert("Failed to reach the server for a hard sync.");
             }
         };
+        // ==========================================
+        // ACTIVE SESSION & ACTIVITY TRACKER
+        // ==========================================
+        const startUserHeartbeat = () => {
+            const currentUser = JSON.parse(sessionStorage.getItem('upia_user'));
+            if (!currentUser) return;
+
+            const sendPing = () => {
+                fetch('/api/system/ping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: currentUser.email,
+                        name: currentUser.name,
+                        action: 'Active on Dashboard' // Or dynamically pass current view
+                    })
+                }).catch(err => console.warn("Ping failed:", err));
+            };
+
+            // Ping immediately, then every 60 seconds
+            sendPing();
+            setInterval(sendPing, 60000);
+        };
+
+        // Call this right after a successful login or page load!
+        window.addEventListener('load', () => {
+            if (sessionStorage.getItem('upia_user')) {
+                startUserHeartbeat();
+            }
+        });
     </script>
 </body>
 </html>

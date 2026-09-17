@@ -5,6 +5,7 @@ import redis
 import time
 import psutil
 import csv
+from flask_cors import CORS
 from io import StringIO
 from flask import Response
 from flask import request
@@ -22,6 +23,17 @@ load_dotenv()
 app = Flask(__name__)
 Compress(app)
 
+# --- ADD THIS CORS SECURITY BLOCK ---
+cors_origins = os.environ.get('CORS_ORIGINS', '*')
+if cors_origins == '*':
+    # If not defined, allow all (will trigger the Warning badge)
+    CORS(app)
+else:
+    # Lock down /api/ routes to specific domains (Secured)
+    allowed_domains = [domain.strip() for domain in cors_origins.split(',')]
+    CORS(app, resources={r"/api/*": {"origins": allowed_domains}})
+# ------------------------------------
+
 app.config['CACHE_TYPE'] = 'SimpleCache'  
 app.config['CACHE_DEFAULT_TIMEOUT'] = 600  
 
@@ -30,35 +42,43 @@ cache = Cache(app)
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 redis_client = redis.from_url(redis_url, decode_responses=True)
 
-@app.before_request
-def track_user_activity():
-    # Only track API routes to avoid cluttering the log with static files
-    if not request.path.startswith('/api/'):
-        return
+# ==========================================
+# 1. LIVE USER HEARTBEAT & ACTIVITY LOGGER
+# ==========================================
+@app.route('/api/system/ping', methods=['POST'])
+def system_ping():
+    data = request.get_json() or {}
+    email = data.get('email', 'Anonymous')
+    name = data.get('name', 'Unknown User')
+    action = data.get('action', 'Active on Dashboard')
 
     try:
-        # If we know who the user is (e.g., from a session or token)
-        user_email = "Anonymous"
         current_time = int(time.time())
         
-        # 1. Update Active Sessions (Use 'mapping=' to prevent version crashes)
-        redis_client.zadd("active_sessions", mapping={user_email: current_time})
+        # 1. Track Live Active Users (Expires after 120 seconds of inactivity)
+        redis_client.zadd("live_users_timestamps", mapping={email: current_time})
         
-        # 2. Log the specific action
-        action_log = {
-            "time": "Just now", 
-            "user": user_email, 
-            "action": f"Accessed {request.path}"
-        }
-        
-        # Push to a Redis list and keep only the last 20 activities
-        redis_client.lpush("live_activities", json.dumps(action_log))
-        redis_client.ltrim("live_activities", 0, 19)
-        
-    except Exception as e:
-        # CRITICAL SAFETY NET: If Redis fails, print the error but DO NOT crash the app
-        print(f"DEBUG: Redis Activity Tracking Error: {e}")
+        # 2. Store the user's name for UI display
+        redis_client.hset("live_users_names", email, name)
 
+        # 3. Append to Permanent Historical Activity Log (Skip background pings)
+        if action != 'Active on Dashboard':
+            log_entry = {
+                "time": time.strftime("%I:%M %p"),
+                "date": time.strftime("%Y-%m-%d"),
+                "user": name,
+                "email": email,
+                "action": action
+            }
+            # Push to a persistent Redis list and keep the last 1000 logs
+            redis_client.lpush("historical_activity_log", json.dumps(log_entry))
+            redis_client.ltrim("historical_activity_log", 0, 999) 
+
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Ping Error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
 # ==========================================
 # 1. THE GLOBAL IP BOUNCER (BULLETPROOFED)
 # ==========================================
@@ -109,21 +129,21 @@ def block_suspicious_ip():
 def get_admin_metrics():
     try:
         current_time = int(time.time())
-        fifteen_mins_ago = current_time - 900
         
-        redis_client.zremrangebyscore("active_sessions", 0, fifteen_mins_ago)
-        active_count = redis_client.zcard("active_sessions")
+        # Clean up inactive users (older than 120 seconds)
+        redis_client.zremrangebyscore("live_users_timestamps", 0, current_time - 120)
+        active_count = redis_client.zcard("live_users_timestamps")
 
         cpu_load = psutil.cpu_percent(interval=None)
         
-        # Safely parse activities
-        raw_activities = redis_client.lrange("live_activities", 0, 9)
+        # Pull from the new historical log instead of the old stateless log
+        raw_activities = redis_client.lrange("historical_activity_log", 0, 9)
         recent_activities = []
         for act in raw_activities:
             try:
                 recent_activities.append(json.loads(act))
             except:
-                pass # Ignore corrupted JSON from old tests
+                pass 
 
         # Safely parse threats
         raw_threats = redis_client.lrange("live_threats", 0, 4)
@@ -134,7 +154,6 @@ def get_admin_metrics():
             except:
                 pass
 
-        # Safely handle latency floats (e.g., if Redis returns "45.12")
         latency_val = redis_client.get("avg_api_latency")
         try:
             latency = int(float(latency_val)) if latency_val else 45
@@ -155,7 +174,6 @@ def get_admin_metrics():
     except Exception as e:
         print(f"Metrics Route Crash: {e}")
         return jsonify({"error": "Internal Server Error syncing metrics"}), 500
-
 # ==========================================
 # 1. API LATENCY TRACKER (The Speedometer)
 # ==========================================
@@ -298,7 +316,13 @@ def auth_google():
         return jsonify({'success': False, 'error': 'Missing Google token from frontend.'}), 400
 
     try:
-        idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+        # Add a 60-second grace period for server clock drift
+        idinfo = id_token.verify_oauth2_token(
+            token, 
+            requests.Request(), 
+            GOOGLE_CLIENT_ID, 
+            clock_skew_in_seconds=60
+        )
         email = idinfo['email'].lower()
         
         sheet_id = app.config.get('SHEET_ID')
@@ -648,7 +672,15 @@ def export_security_log():
         # 4. Write Banned IPs
         for ip in banned_ips:
             cw.writerow(['BANNED IP', 'Permanent', ip, 'Blocked by Admin or System'])
-            
+        # 4.5 Write Historical Activity
+        raw_activities = redis_client.lrange("historical_activity_log", 0, -1) or []
+        for act in raw_activities:
+            try:
+                act_data = json.loads(act)
+                cw.writerow(['ACTIVITY', f"{act_data.get('date', '')} {act_data.get('time', '')}", act_data.get('user', ''), act_data.get('action', '')])
+            except:
+                pass
+
         # 5. Write Threat Logs
         for t in raw_threats:
             try:

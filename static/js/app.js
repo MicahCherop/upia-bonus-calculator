@@ -207,34 +207,65 @@ window.renderGoogleButton = function() {
             if (user._lateCache[monthCode] !== undefined) return user._lateCache[monthCode];
 
             const evaluate = () => {
+                // No limit for transferred staff
                 const isTransfer = user.previous_branch && String(user.previous_branch).trim() !== "";
                 if (isTransfer) return false; 
                 
-                if (!user.date_reported) return true; 
+                // No limit for empty dates
+                if (!user.date_reported) return false; 
 
-                let str = String(user.date_reported).trim().split(' ')[0];
-                if (str === "" || str.toLowerCase().includes("n/a") || str.toLowerCase() === "none" || str.toLowerCase() === "not reported") return true; 
+                let str = String(user.date_reported).trim().toLowerCase();
+                
+                // Treat Google Sheets blank artifacts ("nan", "n/a", "-") as empty = No limit
+                const safeBlanks = ['n/a', 'na', 'none', 'not reported', 'nan', 'null', 'undefined', '-', ''];
+                if (safeBlanks.includes(str)) return false; 
 
-                const parts = str.split(/[-/]/);
+                let reportDate = new Date(NaN); // Default to invalid
+
+                // ALWAYS parse manually first to stop JS from flipping 12-3-2026 to Dec 3rd
+                const parts = str.split(/[-/ \s]/).filter(p => p);
                 if (parts.length >= 3) {
-                    let day, month, year;
-                    if (parts[0].length === 4) { 
-                        year = parseInt(parts[0], 10); month = parseInt(parts[1], 10); day = parseInt(parts[2], 10);
-                    } else { 
-                        day = parseInt(parts[0], 10); month = parseInt(parts[1], 10); year = parseInt(parts[2], 10);
+                    let p0 = parseInt(parts[0], 10);
+                    let p1 = parseInt(parts[1], 10);
+                    let p2 = parseInt(parts[2], 10);
+                    let d, m, y;
+
+                    // If it starts with YYYY (e.g., 2026-03-12)
+                    if (p0 > 1000) {
+                        y = p0; m = p1; d = p2;
+                    } else {
+                        // Standard DD-MM-YYYY (e.g., 12-3-2026)
+                        d = p0;
+                        if (isNaN(p1)) {
+                            // Extract text months (e.g., "Aug" -> 8)
+                            const monthMap = {jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12};
+                            m = monthMap[parts[1].substring(0,3)];
+                        } else {
+                            m = p1;
+                        }
+                        y = p2;
                     }
-                    const reportMonthCode = `${year}${String(month).padStart(2, '0')}`;
-                    if (monthCode === reportMonthCode && day > 5) return true;
-                    if (monthCode < reportMonthCode) return true;
+
+                    // Fix 2-digit years (e.g., 26 -> 2026)
+                    if (y < 100) y += 2000;
+
+                    if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+                        reportDate = new Date(y, m - 1, d); // JS Date requires Month index (0-11)
+                    }
                 } else {
-                    const d = new Date(str);
-                    if (!isNaN(d.getTime())) {
-                        const day = d.getDate();
-                        const reportMonthCode = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
-                        if (monthCode === reportMonthCode && day > 5) return true;
-                        if (monthCode < reportMonthCode) return true;
-                    }
+                    // Fallback for native formats only if split fails
+                    reportDate = new Date(str);
                 }
+
+                // Final Evaluation
+                if (!isNaN(reportDate.getTime())) {
+                    const rDay = reportDate.getDate();
+                    const rMonthCode = `${reportDate.getFullYear()}${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
+                    
+                    if (monthCode === rMonthCode && rDay > 5) return true; // Arrived after the 5th of the evaluated month
+                    if (monthCode < rMonthCode) return true; // Arrived in a future month entirely
+                }
+
                 return false;
             };
 
@@ -242,7 +273,6 @@ window.renderGoogleButton = function() {
             user._lateCache[monthCode] = result; // Save to cache
             return result;
         };
-
 
         // 🚀 SPEED FIX: Global dictionary to prevent millions of loop iterations
         let _perfIndexCache = null;
@@ -950,23 +980,9 @@ window.renderGoogleButton = function() {
                 const data = await res.json();
                 
                 if (data.success) {
-                    
-                    if (activeProfile.isHistorical) {
-                        data.eligibility.date_disqualified = false;
-                    } 
-                    else if (checkLateReporting(viewedUser, selectedMonth)) {
-                        data.eligibility.date_disqualified = true;
-                        data.eligibility.full_bonus = false;
-                        data.eligibility.collection_bonus_45 = false;
-                        data.current.base_bonus = 0;
-                        data.collection.upside = 0;
-                        if (data.next_band) {
-                            data.next_band.potential_bonus = 0;
-                            data.next_band.bonus_opportunity = 0;
-                        }
-                    }
+                    // Let the Python backend handle ALL date disqualifications natively
                     renderDashboardData(data, payload.salary);
-                } else {
+                }else {
                     console.error("Calculate API returned success: false");
                 }
             } catch (err) { console.error("Calculation Error:", err); }
