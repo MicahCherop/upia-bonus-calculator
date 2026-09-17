@@ -107,7 +107,7 @@ def calculate_bonus(data, config):
                     collection_bonus_45 = False
                     date_disqualified = True
                     
-            except Exception:
+            except (ValueError, KeyError, TypeError, IndexError):
                 pass
     # --------------------------------
 

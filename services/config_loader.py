@@ -4,12 +4,19 @@ import re
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+
 def fetch_csv_rows(sheet_id, sheet_name):
     encoded_name = urllib.parse.quote(sheet_name)
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_name}"
+    
+    # B310 Fix: Validate scheme before opening URL
+    parsed_url = urllib.parse.urlparse(url)
+    if parsed_url.scheme not in ('http', 'https'):
+        raise ValueError(f"Invalid URL scheme: {parsed_url.scheme}")
+
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
             content = resp.read().decode('utf-8')
         return list(csv.reader(io.StringIO(content)))
     except Exception as e:
@@ -62,7 +69,7 @@ def load_configuration(sheet_id):
                         "id": "MGT",     
                         "type": role     
                     }
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, IndexError) as e:
             print(f"Warning: Could not fetch Management sheet data. Error: {e}")
             
         return config
@@ -180,7 +187,7 @@ def _parse_staff_list(rows):
             if len(r) > 2 and '@' in str(r[2]):
                 while len(r) < 12: r.append("")
                 valid_rows.append(r)
-        except Exception:
+        except (KeyError, ValueError, TypeError, IndexError):
             continue
 
     for row in valid_rows:
@@ -197,29 +204,26 @@ def _parse_staff_list(rows):
                 "previous_staff": "",
                 "previous_branch": "",
                 "previous_role": "",
-                "previous_pairs": "", # ADDED: Initializes previous pairs
+                "previous_pairs": "",
                 "date_exited": ""
             }
 
-    # SECOND PASS: THE HACK - Match Col H to Col A
+    # SECOND PASS: Match Col H to Col A
     for search_row in rows[1:]:
         try:
             while len(search_row) < 12: search_row.append("")
             
-            # Scans Column H for a name (e.g., Nelson Mandela)
             col_h_name = str(search_row[7]).strip().lower()
             
             if col_h_name:
-                # Find the active employee that matches this name
                 for email, emp in employees.items():
                     if emp["name"].lower() == col_h_name:
-                        # Found them! Steal the data from this old row.
                         emp["previous_staff"] = str(search_row[7]).strip()
-                        emp["previous_branch"] = str(search_row[0]).strip() # Column A
-                        emp["date_exited"] = str(search_row[10]).strip()    # Column K
+                        emp["previous_branch"] = str(search_row[0]).strip()
+                        emp["date_exited"] = str(search_row[10]).strip()
                         emp["previous_role"] = str(search_row[9]).strip() or str(search_row[4]).strip()
-                        emp["previous_pairs"] = str(search_row[3]).strip() or "1" # ADDED: Steals the old Pairs (Column D)
-        except Exception:
+                        emp["previous_pairs"] = str(search_row[3]).strip() or "1"
+        except (KeyError, ValueError, TypeError, IndexError):
             continue
 
     return employees
@@ -259,7 +263,7 @@ def _parse_performance(rows):
                         v_str = str(val).strip().replace('%', '').replace(',', '').replace('KES', '')
                         if v_str.lower() in ['-', '', 'nan', '#n/a', '#ref!', '#value!', 'null', 'none']: return 0.0
                         return float(v_str)
-                    except Exception: return 0.0
+                    except (ValueError, TypeError): return 0.0
 
                 def get_val(possible_keywords, col_idx):
                     for kw in possible_keywords:
@@ -281,7 +285,7 @@ def _parse_performance(rows):
                     "nc_rate": get_val(["nc rate"], 15), "overall_otc": get_val(["ovrll otc", "overall otc"], 16),
                     "dd7_rate": get_val(["dd7 rate", "dd7"], 19), "new_customer_otc": get_val(["new customer", "nc otc", "new cust otc"], 21)
                 }
-        except Exception: continue
+        except (KeyError, ValueError, TypeError, IndexError): continue
     return perf_records
 
 def _parse_bm_performance(rows):
@@ -314,7 +318,7 @@ def _parse_bm_performance(rows):
                         v_str = str(val).strip().replace('%', '').replace(',', '').replace('KES', '')
                         if v_str.lower() in ['-', '', 'nan', '#n/a', '#ref!', '#value!', 'null', 'none']: return 0.0
                         return float(v_str)
-                    except Exception: return 0.0
+                    except (ValueError, TypeError): return 0.0
 
                 lookup_key = f"{branch}_{month_code}"
                 perf_records[lookup_key] = {
@@ -325,5 +329,5 @@ def _parse_bm_performance(rows):
                     "nc_rate": _clean_float(row[13]), "overall_otc": _clean_float(row[14]),
                     "dd7_rate": _clean_float(row[17]), "new_customer_otc": _clean_float(row[19]) 
                 }
-        except Exception: continue
+        except (KeyError, ValueError, TypeError, IndexError): continue
     return perf_records
