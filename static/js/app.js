@@ -424,10 +424,14 @@ window.renderGoogleButton = function() {
 
                 const passes_collections = round2(otc) >= 91.50 && round2(dd7) >= 94.00 && passes_nc_otc;
                 const passes_sales = round2(disb) >= 98.00 && round2(ac) >= 95.00 && round2(nc) >= 95.00;
+                
+                // --- NEW 95% DISBURSEMENT FLOOR FOR 45% BONUS ---
+                const passes_disb_floor = round2(disb) >= 95.00;
 
                 return {
                     full: passes_sales && passes_collections,
-                    partial: passes_collections && !passes_sales
+                    // MUST pass collections, NOT pass full sales, AND hit at least 95% disbursement
+                    partial: passes_collections && !passes_sales && passes_disb_floor 
                 };
             };
 
