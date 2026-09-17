@@ -36,3 +36,8 @@ jobs:
           PYTHONPATH: .
         run: |
           pytest tests/ --doctest-modules -v
+      - name: Run Security Audit
+        run: |
+          pip install bandit pip-audit
+          bandit -r services/
+          pip-audit

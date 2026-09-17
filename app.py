@@ -17,12 +17,24 @@ from services.bonus_engine import calculate_bonus
 from dotenv import load_dotenv
 from flask_compress import Compress
 from flask_caching import Cache
+from flask import Flask, session, jsonify, request
 
 load_dotenv()
 
 app = Flask(__name__)
 Compress(app)
 
+app = Flask(__name__)
+Compress(app)
+
+# Required for session cookies to function securely
+app.secret_key = os.environ.get('SECRET_KEY', 'upia-secure-secret-key-change-in-prod')
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE='Lax'
+)
 # --- ADD THIS CORS SECURITY BLOCK ---
 cors_origins = os.environ.get('CORS_ORIGINS', '*')
 if cors_origins == '*':
@@ -41,6 +53,39 @@ cache = Cache(app)
 
 redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 redis_client = redis.from_url(redis_url, decode_responses=True)
+
+@app.route('/api/performance/<target_staff_id>', methods=['GET'])
+def get_staff_performance(target_staff_id):
+    # 1. Authentication Check
+    user = session.get('user')
+    if not user:
+        return jsonify({"error": "Unauthenticated"}), 401
+
+    # 2. Extract normalized role and staff ID from session
+    user_role = str(user.get('type', '')).strip().upper()
+    user_staff_id = str(user.get('id', '')).strip()
+
+    # 3. IDOR Protection: Block LOCO staff from accessing records other than their own
+    if "LOCO" in user_role and user_staff_id != str(target_staff_id).strip():
+        return jsonify({"error": "Unauthorized access to staff record"}), 403
+
+    # 4. Fetch configurations from Cache/Redis
+    config = app.config.get('BONUS_CONFIG') or get_cached_config(app.config.get('SHEET_ID'))
+    if not config:
+        return jsonify({"error": "Configuration unavailable"}), 500
+
+    # 5. Locate requested staff record by ID across staff and management pools
+    staff_pool = list(config.get('staff', {}).values()) + list(config.get('management', {}).values())
+    target_record = next(
+        (member for member in staff_pool if str(member.get('id', '')).strip() == str(target_staff_id).strip()),
+        None
+    )
+
+    if not target_record:
+        return jsonify({"error": "Staff record not found"}), 404
+
+    return jsonify({"success": True, "data": target_record}), 200
+
 
 # ==========================================
 # 1. LIVE USER HEARTBEAT & ACTIVITY LOGGER
@@ -422,6 +467,10 @@ def auth_google():
                     'user': user_info
                 }
 
+                # Save user to Flask session so subsequent API calls can verify identity
+                session['user'] = user_info
+                session.permanent = True
+
                 # CACHING FOR OPS MANAGERS
                 if user_info.get('is_ops'):
                     current_time = time.time()
@@ -743,6 +792,8 @@ def flush_and_sync():
     except Exception as e:
         log_sheet_sync(success=False)
         return jsonify({"error": f"Hard sync failed: {str(e)}"}), 500
-    
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
