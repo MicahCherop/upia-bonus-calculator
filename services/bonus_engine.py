@@ -235,7 +235,7 @@ def calculate_bonus(data, config):
             "band": current_band,
             "min": current_min,
             "max": current_max,
-            "multiplier": display_multiplier, 
+            "multiplier": active_multiplier,
             "customers": customers,
             "base_bonus": base_bonus
         },
