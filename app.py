@@ -175,35 +175,50 @@ def get_admin_metrics():
     try:
         current_time = int(time.time())
         
-        # Clean up inactive users (older than 120 seconds)
-        redis_client.zremrangebyscore("live_users_timestamps", 0, current_time - 120)
-        active_count = redis_client.zcard("live_users_timestamps")
-
-        cpu_load = psutil.cpu_percent(interval=None)
-        
-        # Pull from the new historical log instead of the old stateless log
-        raw_activities = redis_client.lrange("historical_activity_log", 0, 9)
-        recent_activities = []
-        for act in raw_activities:
-            try:
-                recent_activities.append(json.loads(act))
-            except:
-                pass 
-
-        # Safely parse threats
-        raw_threats = redis_client.lrange("live_threats", 0, 4)
-        recent_threats = []
-        for t in raw_threats:
-            try:
-                recent_threats.append(json.loads(t))
-            except:
-                pass
-
-        latency_val = redis_client.get("avg_api_latency")
+        # 1. Active Users Tracker (Resilient to Redis connection pool limits)
         try:
+            redis_client.zremrangebyscore("live_users_timestamps", 0, current_time - 120)
+            active_count = redis_client.zcard("live_users_timestamps") or 0
+        except Exception as r_err:
+            print(f"Metrics Redis Active User Error: {r_err}")
+            active_count = 0
+
+        # 2. Server Load (Non-blocking hardware check)
+        try:
+            cpu_load = psutil.cpu_percent(interval=None)
+        except Exception:
+            cpu_load = 0.0
+
+        # 3. Pull Recent Historical Activities
+        recent_activities = []
+        try:
+            raw_activities = redis_client.lrange("historical_activity_log", 0, 9) or []
+            for act in raw_activities:
+                try:
+                    recent_activities.append(json.loads(act))
+                except (json.JSONDecodeError, TypeError):
+                    continue
+        except Exception as r_err:
+            print(f"Metrics Redis Activity Log Error: {r_err}")
+
+        # 4. Pull Recent Threats
+        recent_threats = []
+        try:
+            raw_threats = redis_client.lrange("live_threats", 0, 4) or []
+            for t in raw_threats:
+                try:
+                    recent_threats.append(json.loads(t))
+                except (json.JSONDecodeError, TypeError):
+                    continue
+        except Exception as r_err:
+            print(f"Metrics Redis Threat Log Error: {r_err}")
+
+        # 5. API Latency Calculation
+        try:
+            latency_val = redis_client.get("avg_api_latency")
             latency = int(float(latency_val)) if latency_val else 45
-        except:
-            latency = 45 
+        except (ValueError, TypeError, Exception):
+            latency = 45
 
         metrics_payload = {
             "active_sessions": active_count,
@@ -214,11 +229,20 @@ def get_admin_metrics():
             "recent_threats": recent_threats
         }
         
-        return jsonify(metrics_payload)
-    
+        return jsonify(metrics_payload), 200
+
     except Exception as e:
-        print(f"Metrics Route Crash: {e}")
-        return jsonify({"error": "Internal Server Error syncing metrics"}), 500
+        print(f"Metrics Route Fallback Triggered: {e}")
+        # Return fallback JSON payload so dashboard polling components never crash with HTTP 500s
+        return jsonify({
+            "active_sessions": 0,
+            "cpu_load": 0.0,
+            "api_latency": 45,
+            "is_crashing": False,
+            "recent_activities": [],
+            "recent_threats": [],
+            "warning": "Metrics temporarily degraded under heavy load"
+        }), 200
 # ==========================================
 # 1. API LATENCY TRACKER (The Speedometer)
 # ==========================================
@@ -528,6 +552,24 @@ def calculate():
 
         raw_result = calculate_bonus(data, app.config['BONUS_CONFIG'])
         safe_result = sanitize_floats(raw_result)
+
+        # Audit Trail Logging (Safely guarded against NoneType sessions)
+        user_info = session.get('user') or {}
+        audit_entry = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "epoch": int(time.time()),
+            "executed_by": user_info.get('email', 'Anonymous'),
+            "user_role": user_info.get('type', 'Unknown'),
+            "input_payload": data,
+            "calculated_payout": safe_result,
+            "sheet_version": app.config.get('BONUS_CONFIG', {}).get('version', 'v1.0')
+        }
+
+        try:
+            redis_client.lpush("audit_trail:calculations", json.dumps(audit_entry))
+            redis_client.ltrim("audit_trail:calculations", 0, 9999)  # Retain last 10,000 runs
+        except Exception as log_err:
+            print(f"Audit Log Error: {log_err}")
 
         return jsonify({"success": True, **safe_result})
 
