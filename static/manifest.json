@@ -1,38 +1,38 @@
 {
-    "id": "/",
-    "name": "Upia Bonus Calculator",
-    "short_name": "Upia Bonus",
-    "description": "Executive Dashboard & Bonus Calculator",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#0f172a",
-    "theme_color": "#0f172a",
-    "icons": [
-        {
-            "src": "/static/icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any"
-        },
-        {
-            "src": "/static/icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
-        }
-    ],
-    "screenshots": [
-        {
-            "src": "/static/screenshot-mobile.png",
-            "sizes": "750x1334",
-            "type": "image/png",
-            "form_factor": "narrow"
-        },
-        {
-            "src": "/static/screenshot-desktop.png",
-            "sizes": "1280x720",
-            "type": "image/png",
-            "form_factor": "wide"
-        }
-    ]
+  "id": "/",
+  "name": "Upia Bonus Calculator",
+  "short_name": "Upia Bonus",
+  "description": "Executive Dashboard & Bonus Calculator",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/static/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ]
 }
